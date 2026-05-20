@@ -1,19 +1,22 @@
 from collections.abc import Generator
+import os
 
+from dotenv import load_dotenv
 from sqlalchemy import URL, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from app.core.config import settings
+
+load_dotenv()
 
 
 database_url = URL.create(
-    drivername=settings.DATABASE_DRIVER,
-    username=settings.DATABASE_USER,
-    password=settings.DATABASE_PASSWORD,
-    host=settings.DATABASE_HOST,
-    port=settings.DATABASE_PORT,
-    database=settings.DATABASE_NAME,
-    query={"sslmode": settings.DATABASE_SSL_MODE},
+    drivername=os.getenv("DATABASE_DRIVER", "postgresql+psycopg"),
+    username=os.getenv("DATABASE_USER", "postgres"),
+    password=os.getenv("DATABASE_PASSWORD", ""),
+    host=os.getenv("DATABASE_HOST", "localhost"),
+    port=int(os.getenv("DATABASE_PORT", "5432")),
+    database=os.getenv("DATABASE_NAME", "postgres"),
+    query={"sslmode": os.getenv("DATABASE_SSL_MODE", "require")},
 )
 
 engine = create_engine(database_url, pool_pre_ping=True)

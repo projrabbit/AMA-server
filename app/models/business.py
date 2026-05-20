@@ -411,6 +411,7 @@ class AuditLog(Base):
     target_entity: Mapped[str] = mapped_column(String(100), nullable=False)
     target_id: Mapped[int | None] = mapped_column(Integer)
     payload: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    ip_address: Mapped[str | None] = mapped_column(String(45))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
