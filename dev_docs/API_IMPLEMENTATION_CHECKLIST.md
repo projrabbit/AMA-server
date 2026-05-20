@@ -7,7 +7,7 @@ Tracks implementation status of every endpoint defined in `FULL_API_DOCS.md`.
 - 🚧 In Progress — partially implemented
 - ⬜ Not Started
 
-**Progress**: 5 / 47 endpoints complete
+**Progress**: 31 / 47 endpoints complete
 
 ---
 
@@ -55,20 +55,30 @@ Tracks implementation status of every endpoint defined in `FULL_API_DOCS.md`.
 
 | Status | Method | Endpoint | Notes |
 |--------|--------|----------|-------|
-| ⬜ | `GET` | `/buildings` | Optional `include_floors`, search by name/address |
-| ⬜ | `POST` | `/buildings` | Validates ArcGIS layer ID |
-| ⬜ | `PUT` | `/buildings/{building_id}` | Re-validates ArcGIS layer on update |
-| ⬜ | `GET` | `/buildings/{building_id}/floors` | List floors with altitude ranges |
-| ⬜ | `POST` | `/buildings/{building_id}/floors` | Altitude range required |
-| ⬜ | `PUT` | `/floors/{floor_id}` | Update altitude range |
-| ⬜ | `GET` | `/geofences` | Filter by building, floor, is_active |
-| ⬜ | `POST` | `/geofences` | Overlap check via PostGIS |
-| ⬜ | `PUT` | `/geofences/{geofence_id}` | Re-runs overlap check |
-| ⬜ | `DELETE` | `/geofences/{geofence_id}` | Soft delete (`is_active = false`) |
+| ✅ | `GET` | `/buildings` | `include_floors` populates nested floors list; q searches name+address; non-paginated |
+| ✅ | `POST` | `/buildings` | ArcGIS validation is a stub (non-empty string passes); 400 `INVALID_ARCGIS_LAYER` on empty |
+| ✅ | `PUT` | `/buildings/{building_id}` | Re-runs ArcGIS stub only when `arcgis_layer_id` field is provided in body |
+| ✅ | `GET` | `/buildings/{building_id}/floors` | 404 `BUILDING_NOT_FOUND` if building missing |
+| ✅ | `POST` | `/buildings/{building_id}/floors` | 400 `INVALID_ALTITUDE_RANGE` if min >= max; 409 `FLOOR_NUMBER_EXISTS` for duplicate number per building |
+| ✅ | `PUT` | `/floors/{floor_id}` | Merges existing altitude values with request before validating; 400 if merged result invalid |
+| ✅ | `GET` | `/geofences` | Non-paginated; joins GeofenceRule→CellSpace→Floor→Building; filter by building_id/floor_id/is_active |
+| ✅ | `POST` | `/geofences` | Creates CellSpace + GeofenceRule atomically (flush+commit); Python Haversine overlap check |
+| ✅ | `PUT` | `/geofences/{geofence_id}` | Overlap check excludes self; updates CellSpace (name/lat/lng) and GeofenceRule (radius/altitude/flags) |
+| ✅ | `DELETE` | `/geofences/{geofence_id}` | Soft delete — sets `is_active=False`; 409 `ALREADY_DISABLED` if already inactive |
 
-**Notes**
-- Overlap validation requires PostGIS `ST_DWithin` or `ST_Distance` query
-- GIS models live in `app/models/gis.py` — `Building`, `Floor`, `GeofenceRule`, `CellSpace`
+**Files written**
+- `app/schemas/geofence.py` — all request/response models
+- `app/repositories/geofence_repository.py` — all DB queries
+- `app/services/geofence_service.py` — business logic, Haversine helpers, ArcGIS stub
+- `app/api/v1/endpoints/buildings.py` — 5 route handlers (GET/POST buildings, PUT building, GET/POST floors)
+- `app/api/v1/endpoints/floors.py` — 1 route handler (PUT floor)
+- `app/api/v1/endpoints/geofences.py` — 4 route handlers (GET/POST/PUT/DELETE geofences)
+- `app/api/v1/router.py` — registered 3 new routers (buildings, floors, geofences)
+- `tests/geofence/__init__.py`
+- `tests/geofence/conftest.py` — make_building, make_floor, make_geofence, as_hr, as_admin
+- `tests/geofence/test_buildings.py` — 27 tests
+- `tests/geofence/test_floors.py` — 6 tests
+- `tests/geofence/test_geofences.py` — 20 tests
 
 ---
 
@@ -154,37 +164,55 @@ Tracks implementation status of every endpoint defined in `FULL_API_DOCS.md`.
 
 | Status | Method | Endpoint | Notes |
 |--------|--------|----------|-------|
-| ⬜ | `GET` | `/employees` | Search by name/email/phone; paginated |
-| ⬜ | `POST` | `/employees` | Creates `Employee` + `Account` atomically |
-| ⬜ | `GET` | `/employees/{employee_id}` | Includes account, device, shift |
-| ⬜ | `PUT` | `/employees/{employee_id}` | Email/phone uniqueness re-validated |
-| ⬜ | `PUT` | `/employees/{employee_id}/deactivate` | Sets `status = inactive` and `is_active = false` |
-| ⬜ | `PUT` | `/employees/{employee_id}/shift` | Reassigns existing shift |
+| ✅ | `GET` | `/employees` | ilike search on name/email/phone; paginated; joinloads Account + Department |
+| ✅ | `POST` | `/employees` | `db.flush()` to get employee_id before Account insert; single commit |
+| ✅ | `GET` | `/employees/{employee_id}` | `face_registered=False` stub until Module 5; latest device/shift from list tail |
+| ✅ | `PUT` | `/employees/{employee_id}` | Email/phone uniqueness excludes self; `employee_status` param avoids shadowing `fastapi.status` |
+| ✅ | `PUT` | `/employees/{employee_id}/deactivate` | 409 `ALREADY_INACTIVE` if already inactive; writes 2 audit logs (EMPLOYEE + ACCOUNT) |
+| ✅ | `PUT` | `/employees/{employee_id}/shift` | Sets `shift.employee_id` to point to the employee; 404 if either not found |
 
 ### Departments
 
 | Status | Method | Endpoint | Notes |
 |--------|--------|----------|-------|
-| ⬜ | `GET` | `/departments` | Includes employee count and manager name |
-| ⬜ | `POST` | `/departments` | Name uniqueness check |
-| ⬜ | `PUT` | `/departments/{department_id}` | Name uniqueness re-checked |
+| ✅ | `GET` | `/departments` | Scalar query with correlated COUNT subquery + LEFT JOIN for manager name |
+| ✅ | `POST` | `/departments` | 404 `MANAGER_NOT_FOUND` if `manager_id` provided but employee missing |
+| ✅ | `PUT` | `/departments/{department_id}` | Name conflict check excludes self by `department_id` |
 
 ### Shifts
 
 | Status | Method | Endpoint | Notes |
 |--------|--------|----------|-------|
-| ⬜ | `GET` | `/shifts` | Filter by employee |
-| ⬜ | `POST` | `/shifts` | Conflict check against existing shifts for employee |
-| ⬜ | `PUT` | `/shifts/{shift_id}` | Re-runs conflict check |
+| ✅ | `GET` | `/shifts` | Filter by `employee_id`; joinloads Employee |
+| ✅ | `POST` | `/shifts` | EXISTS conflict query: `start < req_end AND end > req_start` |
+| ✅ | `PUT` | `/shifts/{shift_id}` | Merges existing times with request before conflict check; excludes self via `exclude_shift_id` |
 
 ### Devices
 
 | Status | Method | Endpoint | Notes |
 |--------|--------|----------|-------|
-| ⬜ | `POST` | `/devices/register` | New devices start untrusted |
-| ⬜ | `GET` | `/devices/me` | Current employee's registered device |
-| ⬜ | `GET` | `/devices` | Admin view; filter by trust status, platform |
-| ⬜ | `PUT` | `/devices/{device_id}/trust` | Approve or revoke trust |
+| ✅ | `POST` | `/devices/register` | Upsert on `(employee_id, device_fingerprint)`; new fingerprint → insert, same → update metadata |
+| ✅ | `GET` | `/devices/me` | Returns `list[DeviceDetail]` (not single object); ordered by `registered_at DESC` |
+| ✅ | `GET` | `/devices` | Admin-only; filter by `employee_id`, `is_trusted`, `platform`; joinloads Employee → Department |
+| ✅ | `PUT` | `/devices/{device_id}/trust` | Writes audit log (update, DEVICE); 404 `DEVICE_NOT_FOUND` |
+
+**Files written**
+- `app/models/business.py` — `Device`: added `os_version`, `app_version`, renamed `register_at` → `registered_at`, composite unique `(employee_id, device_fingerprint)`, non-unique individual indexes; `Employee.devices` list relationship
+- `alembic/versions/495dabd80749_update_device_model_for_multi_device_.py` — migration applied
+- `app/schemas/admin.py` — all request/response models for Employees, Departments, Shifts, Devices
+- `app/repositories/admin_repository.py` — all DB queries
+- `app/services/admin_service.py` — business logic with HTTPException error codes
+- `app/api/v1/endpoints/employees.py` — 6 route handlers
+- `app/api/v1/endpoints/departments.py` — 3 route handlers
+- `app/api/v1/endpoints/shifts.py` — 3 route handlers
+- `app/api/v1/endpoints/devices.py` — 4 route handlers
+- `app/api/v1/router.py` — registered 4 new routers
+- `tests/admin/__init__.py`
+- `tests/admin/conftest.py` — fixtures + role-aware auth patches
+- `tests/admin/test_employees.py` — 20 tests
+- `tests/admin/test_departments.py` — 13 tests
+- `tests/admin/test_shifts.py` — 13 tests
+- `tests/admin/test_devices.py` — 16 tests
 
 ---
 
