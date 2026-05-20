@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UIT Building A - Two Floor ArcGIS Test</title>
+    <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/dark/main.css" />
+    <script src="https://js.arcgis.com/4.30/"></script>
+    <style>
+      html,
+      body,
+      #viewDiv {
+        height: 100%;
+        margin: 0;
+        width: 100%;
+      }
+
+      body {
+        background: #07111f;
+        color: #f8fafc;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .panel {
+        background: rgba(7, 17, 31, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        border-radius: 14px;
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+        left: 16px;
+        max-width: 390px;
+        padding: 16px;
+        position: absolute;
+        top: 16px;
+        z-index: 10;
+      }
+
+      .panel h1 {
+        font-size: 18px;
+        line-height: 1.25;
+        margin: 0 0 8px;
+      }
+
+      .panel p,
+      .meta {
+        color: #cbd5e1;
+        font-size: 13px;
+        line-height: 1.45;
+        margin: 0 0 12px;
+      }
+
+      .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      button {
+        background: #38bdf8;
+        border: 0;
+        border-radius: 999px;
+        color: #07111f;
+        cursor: pointer;
+        font-weight: 700;
+        padding: 8px 12px;
+      }
+
+      button.secondary {
+        background: rgba(148, 163, 184, 0.2);
+        color: #f8fafc;
+      }
+
+      #status {
+        color: #93c5fd;
+        font-size: 12px;
+        margin-top: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="viewDiv"></div>
+    <section class="panel">
+      <h1>UIT Building A</h1>
+      <p>
+        Two-floor model for Tòa nhà A, Trường Đại học Công nghệ Thông tin - ĐHQG-HCM.
+        The viewer loads <code>uit_building_a_gis_data.json</code>, renders the provided
+        footprint, and stacks Floor 1 and Floor 2 as real vertical levels.
+      </p>
+      <div class="meta" id="meta">Loading real-address office mock...</div>
+      <div class="buttons">
+        <button id="showAll">Whole 2-Floor Building</button>
+        <button id="floor1" class="secondary">Floor 1 Only</button>
+        <button id="floor2" class="secondary">Floor 2 Only</button>
+      </div>
+      <div id="status">Loading GIS mock data...</div>
+    </section>
+
+    <script>
+      const dataUrl = "uit_building_a_gis_data.json";
+      const roomColors = {
+        entrance: [56, 189, 248, 0.76],
+        "work-zone": [34, 197, 94, 0.72],
+        lab: [34, 197, 94, 0.72],
+        lecture: [129, 140, 248, 0.72],
+        faculty: [45, 212, 191, 0.72],
+        study: [14, 165, 233, 0.72],
+        meeting: [168, 85, 247, 0.72],
+        checkin: [251, 191, 36, 0.78],
+        hr: [244, 114, 182, 0.72],
+        management: [45, 212, 191, 0.72],
+        conference: [129, 140, 248, 0.72]
+      };
+
+      require([
+        "esri/Map",
+        "esri/views/SceneView",
+        "esri/layers/GraphicsLayer",
+        "esri/Graphic",
+        "esri/geometry/Polygon",
+        "esri/geometry/Point",
+        "esri/geometry/Polyline",
+        "esri/symbols/PolygonSymbol3D",
+        "esri/symbols/ExtrudeSymbol3DLayer",
+        "esri/symbols/PointSymbol3D",
+        "esri/symbols/IconSymbol3DLayer",
+        "esri/symbols/LineSymbol3D",
+        "esri/symbols/PathSymbol3DLayer",
+        "esri/widgets/LayerList"
+      ], (
+        ArcGISMap,
+        SceneView,
+        GraphicsLayer,
+        Graphic,
+        Polygon,
+        Point,
+        Polyline,
+        PolygonSymbol3D,
+        ExtrudeSymbol3DLayer,
+        PointSymbol3D,
+        IconSymbol3DLayer,
+        LineSymbol3D,
+        PathSymbol3DLayer,
+        LayerList
+      ) => {
+        const status = document.getElementById("status");
+        const meta = document.getElementById("meta");
+        const floorLayers = new Map();
+
+        const map = new ArcGISMap({
+          basemap: "osm",
+          ground: "world-elevation"
+        });
+
+        const shellLayer = new GraphicsLayer({
+          title: "Transparent Building Shell",
+          elevationInfo: { mode: "relative-to-ground" }
+        });
+        const routeLayer = new GraphicsLayer({
+          title: "Indoor Transitions and Stairs",
+          elevationInfo: { mode: "relative-to-ground" }
+        });
+        const stateLayer = new GraphicsLayer({
+          title: "States and Geofence Points",
+          elevationInfo: { mode: "relative-to-ground" }
+        });
+
+        map.addMany([shellLayer, routeLayer, stateLayer]);
+
+        const view = new SceneView({
+          container: "viewDiv",
+          map,
+          qualityProfile: "high",
+          viewingMode: "local",
+          environment: {
+            atmosphereEnabled: true,
+            lighting: {
+              type: "sun",
+              date: new Date("2026-05-20T09:00:00+07:00")
+            }
+          }
+        });
+
+        view.ui.add(new LayerList({ view }), "top-right");
+
+        fetch(dataUrl)
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+          })
+          .then((data) => {
+            renderBuilding(data);
+            meta.textContent = `${data.building.address} | ${data.building.total_floors} floors | center ${data.building.center.latitude}, ${data.building.center.longitude}`;
+            status.textContent = `Loaded ${data.floors.length} stacked floors, ${data.floors.flatMap((floor) => floor.rooms).length} rooms, and ${data.states.length} state points.`;
+          })
+          .catch((error) => {
+            status.textContent = `Could not load ${dataUrl}. Run a local server from testing/, for example: python -m http.server 8000. Error: ${error.message}`;
+          });
+
+        document.getElementById("showAll").addEventListener("click", () => setFloorVisibility(null));
+        document.getElementById("floor1").addEventListener("click", () => setFloorVisibility(1));
+        document.getElementById("floor2").addEventListener("click", () => setFloorVisibility(2));
+
+        function renderBuilding(data) {
+          const center = data.building.center;
+          const stateById = new Map(data.states.map((state) => [state.state_id, state]));
+
+          view.camera = {
+            position: {
+              longitude: center.longitude - 0.00058,
+              latitude: center.latitude - 0.00045,
+              z: 95
+            },
+            heading: 35,
+            tilt: 66
+          };
+
+          shellLayer.add(createExtrudedPolygon({
+            rings: data.building.footprint,
+            height: data.building.altitude_max,
+            color: [148, 163, 184, 0.18],
+            edgeColor: [226, 232, 240, 0.85],
+            title: data.building.name,
+            attributes: {
+              Name: data.building.name,
+              Address: data.building.address,
+              Floors: data.building.total_floors,
+              HeightMeters: data.building.altitude_max
+            }
+          }));
+
+          data.floors.forEach((floor) => {
+            const floorLayer = new GraphicsLayer({
+              title: `${floor.floor_name} (${floor.altitude_min}-${floor.altitude_max} m)`,
+              elevationInfo: {
+                mode: "relative-to-ground",
+                offset: floor.altitude_min
+              }
+            });
+            floorLayers.set(floor.floor_number, floorLayer);
+            map.add(floorLayer);
+
+            floorLayer.add(createExtrudedPolygon({
+              rings: data.building.footprint,
+              height: 0.18,
+              color: [15, 23, 42, 0.9],
+              edgeColor: [125, 211, 252, 0.85],
+              title: `${floor.floor_name} slab`,
+              attributes: {
+                Floor: floor.floor_number,
+                LevelStartMeters: floor.altitude_min,
+                LevelEndMeters: floor.altitude_max
+              }
+            }));
+
+            floor.rooms.forEach((room) => {
+              floorLayer.add(createExtrudedPolygon({
+                rings: room.boundary,
+                height: floor.altitude_max - floor.altitude_min - 0.35,
+                color: roomColors[room.type] || [59, 130, 246, 0.72],
+                edgeColor: [15, 23, 42, 0.78],
+                title: `${room.name} - Floor ${floor.floor_number}`,
+                attributes: {
+                  Room: room.name,
+                  Type: room.type,
+                  Floor: floor.floor_number,
+                  CellSpaceID: room.cell_space_id,
+                  GeofenceRuleID: room.geofence_rule_id
+                }
+              }));
+            });
+          });
+
+          data.transitions.forEach((transition) => {
+            const fromState = stateById.get(transition.from_state_id);
+            const toState = stateById.get(transition.to_state_id);
+            if (!fromState || !toState) return;
+
+            routeLayer.add(new Graphic({
+              geometry: new Polyline({
+                paths: [[fromState.point, toState.point]],
+                hasZ: true,
+                spatialReference: { wkid: 4326 }
+              }),
+              symbol: new LineSymbol3D({
+                symbolLayers: [new PathSymbol3DLayer({
+                  material: {
+                    color: transition.type === "stairs" ? [251, 113, 133, 0.95] : [250, 204, 21, 0.85]
+                  },
+                  width: transition.type === "stairs" ? 4 : 2.5
+                })]
+              }),
+              popupTemplate: {
+                title: `${transition.type} transition`,
+                content: `Distance: ${transition.distance_m} m`
+              }
+            }));
+          });
+
+          data.states.forEach((state) => {
+            stateLayer.add(new Graphic({
+              geometry: new Point({
+                longitude: state.point[0],
+                latitude: state.point[1],
+                z: state.point[2],
+                spatialReference: { wkid: 4326 }
+              }),
+              symbol: new PointSymbol3D({
+                symbolLayers: [new IconSymbol3DLayer({
+                  resource: { primitive: "circle" },
+                  material: { color: [14, 165, 233, 0.95] },
+                  outline: { color: [255, 255, 255, 0.9], size: 1 },
+                  size: 8
+                })]
+              }),
+              popupTemplate: {
+                title: state.name,
+                content: `Type: ${state.type}<br />Cell space ID: ${state.cell_space_id}<br />Altitude: ${state.point[2]} m`
+              }
+            }));
+          });
+
+          view.goTo({
+            target: shellLayer.graphics.toArray(),
+            tilt: 66,
+            heading: 35
+          });
+        }
+
+        function createExtrudedPolygon({ rings, height, color, edgeColor, title, attributes }) {
+          return new Graphic({
+            geometry: new Polygon({
+              rings: [rings],
+              spatialReference: { wkid: 4326 }
+            }),
+            symbol: new PolygonSymbol3D({
+              symbolLayers: [new ExtrudeSymbol3DLayer({
+                size: height,
+                material: { color },
+                edges: {
+                  type: "solid",
+                  color: edgeColor,
+                  size: 0.8
+                }
+              })]
+            }),
+            attributes,
+            popupTemplate: {
+              title,
+              content: Object.entries(attributes)
+                .map(([key, value]) => `<b>${key}</b>: ${value}`)
+                .join("<br />")
+            }
+          });
+        }
+
+        function setFloorVisibility(floorNumber) {
+          floorLayers.forEach((layer, currentFloor) => {
+            layer.visible = floorNumber === null || currentFloor === floorNumber;
+          });
+          status.textContent = floorNumber === null
+            ? "Showing the whole two-floor building with both stacked levels."
+            : `Showing only floor ${floorNumber}.`;
+        }
+      });
+    </script>
+  </body>
+</html>
