@@ -1,0 +1,10 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    ADM["Admin"]
+    P1("Tra cứu audit log")
+    D8[(Audit Log)]
+
+    ADM -->|"Điều kiện lọc log"| P1
+    P1 -->|"Truy vấn log theo điều kiện"| D8
+    D8 -->|"Danh sách log phù hợp"| P1
+    P1 -->|"Kết quả log và chi tiết"| ADM

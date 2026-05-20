@@ -1,0 +1,10 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    NV["Nhân viên"]
+    P1("Truy vấn lịch sử chấm công")
+    D3[(Bản ghi chấm công)]
+
+    NV -->|"Yêu cầu xem lịch sử và khoảng thời gian"| P1
+    P1 -->|"Truy vấn bản ghi theo nhân viên"| D3
+    D3 -->|"Danh sách bản ghi chấm công"| P1
+    P1 -->|"Lịch sử và tổng giờ làm"| NV

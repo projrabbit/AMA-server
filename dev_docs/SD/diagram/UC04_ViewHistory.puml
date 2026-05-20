@@ -1,0 +1,26 @@
+@startuml UC04_ViewHistory
+title UC-04: Xem lịch sử chấm công cá nhân
+
+actor "Nhân viên" as NV
+participant "Mobile App" as App
+participant "API Server" as API
+database "Database" as DB
+
+NV -> App : Chọn tab "Lịch sử chấm công"
+NV -> App : Chọn khoảng thời gian\n(ngày / tuần / tháng)
+
+App -> API : GET /attendance/history\n?employee_id=&from=&to=
+
+API -> DB : SELECT AttendanceRecord\nWHERE employee_id=?\nAND timestamp BETWEEN ? AND ?\nORDER BY timestamp DESC
+DB --> API : Danh sách bản ghi chấm công
+
+alt Không có dữ liệu
+    API --> App : 200 {records: []}
+    App --> NV : Hiển thị "Không có dữ liệu"
+else Có dữ liệu
+    API -> API : Tính tổng giờ làm\n(pair check_in/check_out theo ngày)
+    API --> App : 200 {records: [...],\ntotal_hours: X}
+    App --> NV : Hiển thị danh sách:\nngày, giờ vào/ra, trạng thái,\ntầng làm việc, tổng giờ
+end
+
+@enduml

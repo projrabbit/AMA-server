@@ -1,0 +1,48 @@
+@startuml UC06_ManageGeofence
+title UC-06: Quản lý Geofence 3D
+
+actor "Admin / HR" as Admin
+participant "Web Dashboard" as Web
+participant "ArcGIS\nScene View" as GIS
+participant "API Server" as API
+database "Database" as DB
+
+== Tạo Geofence mới ==
+
+Admin -> Web : Mở trang Quản lý Geofence
+Web -> API : GET /buildings (danh sách tòa nhà)
+API -> DB : SELECT Building, Floor
+DB --> API : Danh sách Building + Floor
+API --> Web : Building + Floor list
+Web -> GIS : Render ArcGIS Scene View\n(load arcgis_layer_id)
+
+Admin -> GIS : Chọn Building → Floor trên bản đồ 3D
+Admin -> Web : Nhập: center_lat, center_lng,\nradius_meters, altitude_min, altitude_max, name
+
+Web -> API : POST /geofences\n{floor_id, name, center_lat, center_lng,\nradius_meters, altitude_min, altitude_max}
+
+API -> DB : SELECT Geofence WHERE floor_id=?\nAND is_active=TRUE (kiểm tra trùng lặp)
+DB --> API : Danh sách geofence hiện có
+
+alt Geofence trùng lặp (overlap)
+    API --> Web : 409 Conflict\n"Vùng geofence trùng với vùng hiện có"
+    Web --> Admin : Cảnh báo xung đột
+else Hợp lệ
+    API -> DB : INSERT Geofence\n(is_active=TRUE, created_by=account_id)
+    API -> DB : INSERT AuditLog (GEOFENCE_CREATE)
+    API --> Web : 201 Created {geofence_id}
+    Web -> GIS : Vẽ vùng geofence mới trên bản đồ
+    Web --> Admin : Thành công
+end
+
+== Xóa / Vô hiệu hóa Geofence ==
+
+Admin -> Web : Chọn geofence → Xóa
+Web -> API : DELETE /geofences/{id}
+API -> DB : UPDATE Geofence SET is_active=FALSE
+API -> DB : INSERT AuditLog (GEOFENCE_DELETE)
+API --> Web : 200 OK
+Web -> GIS : Xóa marker khỏi bản đồ
+Web --> Admin : Đã xóa
+
+@enduml

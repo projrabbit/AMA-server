@@ -1,0 +1,16 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    HR["HR / Admin"]
+    P1("Quản lý nhân viên và phòng ban")
+    D1[(Tài khoản)]
+    D2[(Nhân viên)]
+    D10[(Phòng ban)]
+    D8[(Audit Log)]
+
+    HR -->|"Thông tin nhân viên mới hoặc cập nhật"| P1
+    P1 -->|"Kiểm tra và lưu nhân viên"| D2
+    D2 -->|"Thông tin nhân viên"| P1
+    P1 -->|"Tạo hoặc khóa tài khoản"| D1
+    P1 -->|"Tạo hoặc cập nhật phòng ban"| D10
+    P1 -->|"Ghi audit log"| D8
+    P1 -->|"Kết quả xử lý"| HR

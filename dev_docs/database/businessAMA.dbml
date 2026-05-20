@@ -1,0 +1,237 @@
+Project AMA_Business_Attendance {
+  database_type: 'PostgreSQL'
+  Note: 'Business database model for employee attendance management, account access, trusted devices, shift assignment, attendance records, fraud detection, and audit logging.'
+}
+
+Enum employee_status {
+  active
+  inactive
+  on_leave
+  terminated
+}
+
+Enum account_role {
+  employee
+  hr
+  manager
+  admin
+}
+
+Enum device_platform {
+  android
+  ios
+  web
+  other
+}
+
+Enum attendance_type {
+  checkin
+  checkout
+}
+
+Enum attendance_status {
+  pending
+  approved
+  rejected
+  flagged
+}
+
+Enum audit_action_type {
+  login
+  logout
+  create
+  update
+  delete
+  checkin
+  checkout
+  approve
+  reject
+}
+
+Table DEPARTMENT {
+  department_id int [pk, increment, not null, note: 'Unique identifier of the department']
+  name varchar(255) [not null, unique, note: 'Department name']
+  description text [note: 'Detailed description of the department']
+  created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: 'Timestamp when the department was created']
+  manager_id int [note: 'Employee who manages this department']
+
+  indexes {
+    (name) [unique]
+    (manager_id)
+  }
+
+  Note: 'Stores department information used to organize employees within the company.'
+}
+
+Table EMPLOYEE {
+  employee_id int [pk, increment, not null, note: 'Unique identifier of the employee']
+  department_id int [not null, note: 'Department that the employee belongs to']
+  full_name varchar(255) [not null, note: 'Full name of the employee']
+  email varchar(255) [not null, unique, note: 'Employee email address']
+  phone varchar(20) [unique, note: 'Employee phone number']
+  position varchar(100) [note: 'Job position of the employee']
+  hire_date date [note: 'Date when the employee was hired']
+  status employee_status [not null, default: 'active', note: 'Current working status of the employee']
+
+  indexes {
+    (department_id)
+    (email) [unique]
+    (phone) [unique]
+    (status)
+  }
+
+  Note: 'Stores employee profile information and links each employee to a department.'
+}
+
+Table ACCOUNT {
+  account_id int [pk, increment, not null, note: 'Unique identifier of the account']
+  employee_id int [not null, unique, note: 'Employee who owns this account']
+  username varchar(100) [not null, unique, note: 'Login username']
+  password_hash varchar(255) [not null, note: 'Hashed password value']
+  role account_role [not null, default: 'employee', note: 'Authorization role of the account']
+  last_login_at datetime [note: 'Last successful login timestamp']
+  is_active boolean [not null, default: true, note: 'Indicates whether the account is active']
+
+  indexes {
+    (employee_id) [unique]
+    (username) [unique]
+    (role)
+    (is_active)
+  }
+
+  Note: 'Stores authentication and authorization data for system users.'
+}
+
+Table DEVICE {
+  device_id int [pk, increment, not null, note: 'Unique identifier of the device']
+  employee_id int [not null, unique, note: 'Employee who registered the device']
+  device_fingerprint varchar(255) [not null, unique, note: 'Unique fingerprint used to identify the device']
+  platform device_platform [not null, note: 'Device operating platform']
+  model varchar(100) [note: 'Device model name']
+  register_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: 'Timestamp when the device was registered']
+  is_trusted boolean [not null, default: false, note: 'Indicates whether the device is trusted for attendance']
+
+  indexes {
+    (employee_id) [unique]
+    (device_fingerprint) [unique]
+    (platform)
+    (is_trusted)
+  }
+
+  Note: 'Stores registered devices used by employees for attendance check-in and check-out.'
+}
+
+Table SHIFT {
+  shift_id int [pk, increment, not null, note: 'Unique identifier of the shift']
+  employee_id int [not null, note: 'Employee assigned to this shift']
+  name varchar(100) [not null, note: 'Shift name']
+  start_time time [not null, note: 'Shift start time']
+  end_time time [not null, note: 'Shift end time']
+  late_tolerance_min int [not null, default: 0, note: 'Allowed late arrival tolerance in minutes. CHECK (late_tolerance_min >= 0)']
+  early_leave_min int [not null, default: 0, note: 'Allowed early leave tolerance in minutes. CHECK (early_leave_min >= 0)']
+  apply_to_weekends boolean [not null, default: false, note: 'Indicates whether this shift applies to weekends']
+
+  indexes {
+    (employee_id)
+    (name)
+    (start_time, end_time)
+  }
+
+  Note: 'Stores working shift configuration assigned to employees.'
+}
+
+Table ATTENDANCE_RECORD {
+  record_id int [pk, increment, not null, note: 'Unique identifier of the attendance record']
+  employee_id int [not null, note: 'Employee who created this attendance record']
+  device_id int [not null, note: 'Device used to create this attendance record']
+  shift_id int [not null, note: 'Shift applied to this attendance record']
+  geofence_rule_id int [not null, note: 'Reference to GEOFENCE_RULE in the GIS 3D schema']
+  type attendance_type [not null, note: 'Attendance action type: checkin or checkout']
+  timestamp datetime [not null, default: `CURRENT_TIMESTAMP`, note: 'Timestamp when the attendance action occurred']
+  latitude decimal(9,6) [not null, note: 'Latitude at the attendance location. CHECK (latitude BETWEEN -90 AND 90)']
+  longitude decimal(9,6) [not null, note: 'Longitude at the attendance location. CHECK (longitude BETWEEN -180 AND 180)']
+  altitude decimal(8,2) [note: 'Altitude value used for 3D geofence validation']
+  gps_accuracy decimal(8,2) [note: 'GPS accuracy in meters. CHECK (gps_accuracy >= 0)']
+  status attendance_status [not null, default: 'pending', note: 'Processing status of the attendance record']
+  rejection_reason text [note: 'Reason why the record was rejected']
+  is_late boolean [not null, default: false, note: 'Indicates whether the employee is late']
+  is_early_leave boolean [not null, default: false, note: 'Indicates whether the employee leaves early']
+
+  indexes {
+    (employee_id)
+    (device_id)
+    (shift_id)
+    (geofence_rule_id)
+    (timestamp)
+    (status)
+    (type)
+  }
+
+  Note: 'Stores check-in and check-out records with GPS 3D location, processing status, and geofence reference.'
+}
+
+Table FRAUD_DETECTION {
+  fraud_id int [pk, increment, not null, note: 'Unique identifier of the fraud detection result']
+  record_id int [not null, unique, note: 'Attendance record checked for fraud']
+  mock_location_detected boolean [not null, default: false, note: 'Indicates whether mock location was detected']
+  gps_spoofing_detected boolean [not null, default: false, note: 'Indicates whether GPS spoofing was detected']
+  buddy_punch_suspected boolean [not null, default: false, note: 'Indicates whether buddy punching is suspected']
+  reason text [note: 'Detailed reason or evidence for fraud detection']
+  checked_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: 'Timestamp when fraud detection was performed']
+
+  indexes {
+    (record_id) [unique]
+    (mock_location_detected)
+    (gps_spoofing_detected)
+    (buddy_punch_suspected)
+    (checked_at)
+  }
+
+  Note: 'Stores fraud detection results for each attendance record.'
+}
+
+Table AUDIT_LOG {
+  log_id int [pk, increment, not null, note: 'Unique identifier of the audit log']
+  account_id int [not null, note: 'Account that created the audit event']
+  action_type audit_action_type [not null, note: 'Type of action performed by the account']
+  target_entity varchar(100) [not null, note: 'Entity or table affected by the action']
+  target_id int [note: 'Identifier of the affected record']
+  payload json [note: 'Detailed audit payload stored as JSON']
+  created_at datetime [not null, default: `CURRENT_TIMESTAMP`, note: 'Timestamp when the audit log was created']
+
+  indexes {
+    (account_id)
+    (action_type)
+    (target_entity)
+    (target_id)
+    (created_at)
+  }
+
+  Note: 'Stores immutable system activity logs for traceability and auditing.'
+}
+
+// Relationships
+
+Ref: EMPLOYEE.department_id > DEPARTMENT.department_id [delete: restrict]
+
+Ref: DEPARTMENT.manager_id > EMPLOYEE.employee_id [delete: set null]
+
+Ref: ACCOUNT.employee_id > EMPLOYEE.employee_id [delete: cascade]
+
+Ref: DEVICE.employee_id > EMPLOYEE.employee_id [delete: cascade]
+
+Ref: SHIFT.employee_id > EMPLOYEE.employee_id [delete: cascade]
+
+Ref: ATTENDANCE_RECORD.employee_id > EMPLOYEE.employee_id [delete: cascade]
+
+Ref: ATTENDANCE_RECORD.device_id > DEVICE.device_id [delete: restrict]
+
+Ref: ATTENDANCE_RECORD.shift_id > SHIFT.shift_id [delete: restrict]
+
+Ref: FRAUD_DETECTION.record_id > ATTENDANCE_RECORD.record_id [delete: cascade]
+
+Ref: AUDIT_LOG.account_id > ACCOUNT.account_id [delete: restrict]
+
+// External relationship:
+// ATTENDANCE_RECORD.geofence_rule_id references GEOFENCE_RULE(geofence_rule_id)
+// in AMA_Indoor_GIS schema.

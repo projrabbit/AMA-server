@@ -1,0 +1,58 @@
+@startuml UC17_ManageBuilding
+title UC-17: Quản lý tòa nhà và tầng
+
+actor "Admin" as Admin
+participant "Web Dashboard" as Web
+participant "ArcGIS\nScene View" as GIS
+participant "API Server" as API
+database "Database" as DB
+
+== Tạo tòa nhà ==
+
+Admin -> Web : Vào "Quản lý Tòa nhà" → "Thêm tòa nhà"
+Admin -> Web : Nhập: name, address,\ncenter_lat, center_lng,\ntotal_floors, arcgis_layer_id
+
+Web -> API : POST /buildings\n{name, address, center_lat, center_lng,\ntotal_floors, arcgis_layer_id}
+
+API -> GIS : Validate arcgis_layer_id\n(kiểm tra layer tồn tại)
+GIS --> API : Layer valid / invalid
+
+alt arcgis_layer_id không hợp lệ
+    API --> Web : 400 Bad Request\n"ArcGIS layer ID không hợp lệ"
+    Web --> Admin : Cảnh báo lỗi tích hợp ArcGIS
+else Hợp lệ
+    API -> DB : INSERT Building
+    API -> DB : INSERT AuditLog (BUILDING_CREATE)
+    API --> Web : 201 Created {building_id}
+    Web -> GIS : Hiển thị tòa nhà trên bản đồ
+    Web --> Admin : Tạo tòa nhà thành công
+end
+
+== Tạo tầng cho tòa nhà ==
+
+Admin -> Web : Chọn Building → "Thêm tầng"
+Admin -> Web : Nhập: floor_number, floor_name,\naltitude_min, altitude_max
+
+Web -> API : POST /buildings/{building_id}/floors\n{floor_number, floor_name,\naltitude_min, altitude_max}
+
+API -> DB : INSERT Floor (building_id, ...)
+API -> DB : INSERT AuditLog (FLOOR_CREATE)
+API --> Web : 201 Created {floor_id}
+Web --> Admin : Tầng được tạo thành công
+
+note right of Admin
+  Sau khi tạo Floor,
+  Admin có thể tạo Geofence
+  cho tầng đó qua UC-06
+end note
+
+== Xem danh sách Building & Floor ==
+
+Admin -> Web : Xem danh sách
+Web -> API : GET /buildings (với floors)
+API -> DB : SELECT Building + Floor
+DB --> API : Building list with floors
+API --> Web : Data
+Web --> Admin : Danh sách tòa nhà và tầng
+
+@enduml

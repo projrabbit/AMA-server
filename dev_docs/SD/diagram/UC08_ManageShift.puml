@@ -1,0 +1,51 @@
+@startuml UC08_ManageShift
+title UC-08: Quản lý ca làm việc (Shift)
+
+actor "HR / Admin" as HR
+participant "Web Dashboard" as Web
+participant "API Server" as API
+database "Database" as DB
+
+== Tạo ca làm việc mới ==
+
+HR -> Web : Vào menu "Quản lý Ca"
+Web -> API : GET /shifts
+API -> DB : SELECT Shift
+DB --> API : Danh sách ca hiện có
+API --> Web : Shift list
+Web --> HR : Hiển thị danh sách ca
+
+HR -> Web : Nhấn "Tạo mới", nhập:\nname, start_time, end_time,\nlate_tolerance_min, early_leave_min,\napply_to_weekends
+
+Web -> API : POST /shifts\n{name, start_time, end_time,\nlate_tolerance_min, early_leave_min,\napply_to_weekends}
+
+alt Thời gian ca xung đột với ca khác
+    API --> Web : 409 Conflict\n"Trùng giờ với ca đang tồn tại"
+    Web --> HR : Cảnh báo xung đột
+else Hợp lệ
+    API -> DB : INSERT Shift
+    API -> DB : INSERT AuditLog (SHIFT_CREATE)
+    API --> Web : 201 Created {shift_id}
+    Web --> HR : Tạo ca thành công
+end
+
+== Gán ca cho nhân viên ==
+
+HR -> Web : Chọn nhân viên → Gán ca
+Web -> API : PUT /employees/{id}/shift\n{shift_id}
+API -> DB : UPDATE Employee\nSET default_shift_id = ?
+API -> DB : INSERT AuditLog (SHIFT_ASSIGN)
+API --> Web : 200 OK
+Web --> HR : Đã gán ca thành công
+
+== Chỉnh sửa ca ==
+
+HR -> Web : Chọn ca → Sửa
+Web --> HR : Cảnh báo: "Ca đang được áp dụng,\nthay đổi sẽ ảnh hưởng check-in tiếp theo"
+HR -> Web : Xác nhận chỉnh sửa
+Web -> API : PUT /shifts/{id} {updated fields}
+API -> DB : UPDATE Shift
+API -> DB : INSERT AuditLog (SHIFT_UPDATE)
+API --> Web : 200 OK
+
+@enduml

@@ -1,0 +1,149 @@
+{
+  "building": {
+    "building_id": 1001,
+    "name": "Tòa nhà A - Trường Đại học Công nghệ Thông tin, ĐHQG-HCM",
+    "address": "Tòa nhà A, Trường Đại học Công nghệ Thông tin - ĐHQG-HCM, Khu phố 6, Phường Linh Trung, Thành phố Thủ Đức, Thành phố Hồ Chí Minh, Việt Nam",
+    "center": {
+      "latitude": 10.8704078,
+      "longitude": 106.80290665
+    },
+    "total_floors": 2,
+    "altitude_min": 0,
+    "altitude_max": 8,
+    "floor_height_m": 4,
+    "footprint": [
+      [106.8028012, 10.8699946],
+      [106.8030244, 10.8699906],
+      [106.8031841, 10.8701294],
+      [106.8031247, 10.8702017],
+      [106.8031308, 10.8702982],
+      [106.8031779, 10.8703525],
+      [106.803008, 10.8704953],
+      [106.8030387, 10.8705275],
+      [106.8030756, 10.8704893],
+      [106.8031718, 10.8705697],
+      [106.8031431, 10.8706099],
+      [106.8031738, 10.8706421],
+      [106.8031738, 10.8706823],
+      [106.8031534, 10.8707024],
+      [106.803182, 10.8707305],
+      [106.8030817, 10.870825],
+      [106.8030305, 10.8707808],
+      [106.802965, 10.8707728],
+      [106.8029199, 10.870819],
+      [106.8028503, 10.8707527],
+      [106.802881, 10.8707165],
+      [106.8028851, 10.8706381],
+      [106.8028483, 10.8705998],
+      [106.8028749, 10.8705456],
+      [106.8028217, 10.8704832],
+      [106.8027889, 10.8705094],
+      [106.8026415, 10.8703686],
+      [106.8026804, 10.8703043],
+      [106.8026906, 10.8702178],
+      [106.8026292, 10.8701434],
+      [106.8028012, 10.8699946]
+    ]
+  },
+  "floors": [
+    {
+      "floor_id": 1001,
+      "floor_number": 1,
+      "floor_name": "Floor 1 - Entrance, Check-in, and Lab Areas",
+      "altitude_min": 0,
+      "altitude_max": 4,
+      "rooms": [
+        {
+          "cell_space_id": 1001,
+          "name": "A1 Main Entrance Lobby",
+          "type": "entrance",
+          "center": [106.80288, 10.87012, 0.6],
+          "geofence_rule_id": 1001,
+          "boundary": [[106.80278, 10.87003], [106.803, 10.87003], [106.8031, 10.87013], [106.80302, 10.87022], [106.8028, 10.87019], [106.8027, 10.87012], [106.80278, 10.87003]]
+        },
+        {
+          "cell_space_id": 1002,
+          "name": "A1 Computer Lab",
+          "type": "lab",
+          "center": [106.80306, 10.87032, 0.6],
+          "geofence_rule_id": 1002,
+          "boundary": [[106.80302, 10.8702], [106.80313, 10.87022], [106.80315, 10.87035], [106.80302, 10.87047], [106.80293, 10.8704], [106.80298, 10.8703], [106.80302, 10.8702]]
+        },
+        {
+          "cell_space_id": 1003,
+          "name": "A1 Lecture Room",
+          "type": "lecture",
+          "center": [106.80305, 10.87064, 0.6],
+          "geofence_rule_id": 1003,
+          "boundary": [[106.80302, 10.8705], [106.80315, 10.8706], [106.80315, 10.8707], [106.80308, 10.87078], [106.80296, 10.8707], [106.80298, 10.87058], [106.80302, 10.8705]]
+        },
+        {
+          "cell_space_id": 1004,
+          "name": "A1 Attendance Check-in Zone",
+          "type": "checkin",
+          "center": [106.80275, 10.87034, 0.6],
+          "geofence_rule_id": 1004,
+          "boundary": [[106.80266, 10.87016], [106.80283, 10.8703], [106.80283, 10.8705], [106.80274, 10.87046], [106.80265, 10.87037], [106.80268, 10.87028], [106.80266, 10.87016]]
+        }
+      ]
+    },
+    {
+      "floor_id": 1002,
+      "floor_number": 2,
+      "floor_name": "Floor 2 - Classrooms and Faculty Areas",
+      "altitude_min": 4,
+      "altitude_max": 8,
+      "rooms": [
+        {
+          "cell_space_id": 1005,
+          "name": "A2 Faculty Office",
+          "type": "faculty",
+          "center": [106.80288, 10.87012, 4.6],
+          "geofence_rule_id": 1005,
+          "boundary": [[106.80278, 10.87003], [106.803, 10.87003], [106.8031, 10.87013], [106.80302, 10.87022], [106.8028, 10.87019], [106.8027, 10.87012], [106.80278, 10.87003]]
+        },
+        {
+          "cell_space_id": 1006,
+          "name": "A2 Meeting Room",
+          "type": "meeting",
+          "center": [106.80306, 10.87032, 4.6],
+          "geofence_rule_id": 1006,
+          "boundary": [[106.80302, 10.8702], [106.80313, 10.87022], [106.80315, 10.87035], [106.80302, 10.87047], [106.80293, 10.8704], [106.80298, 10.8703], [106.80302, 10.8702]]
+        },
+        {
+          "cell_space_id": 1007,
+          "name": "A2 Lecture Room",
+          "type": "lecture",
+          "center": [106.80305, 10.87064, 4.6],
+          "geofence_rule_id": 1007,
+          "boundary": [[106.80302, 10.8705], [106.80315, 10.8706], [106.80315, 10.8707], [106.80308, 10.87078], [106.80296, 10.8707], [106.80298, 10.87058], [106.80302, 10.8705]]
+        },
+        {
+          "cell_space_id": 1008,
+          "name": "A2 Self-study Space",
+          "type": "study",
+          "center": [106.80275, 10.87034, 4.6],
+          "geofence_rule_id": 1008,
+          "boundary": [[106.80266, 10.87016], [106.80283, 10.8703], [106.80283, 10.8705], [106.80274, 10.87046], [106.80265, 10.87037], [106.80268, 10.87028], [106.80266, 10.87016]]
+        }
+      ]
+    }
+  ],
+  "states": [
+    {"state_id": 1001, "cell_space_id": 1001, "name": "Building A Entrance", "type": "entrance", "point": [106.80288, 10.87012, 0.6]},
+    {"state_id": 1002, "cell_space_id": 1004, "name": "Attendance Check-in", "type": "checkin-kiosk", "point": [106.80275, 10.87034, 0.6]},
+    {"state_id": 1003, "cell_space_id": 1002, "name": "Computer Lab Point", "type": "computer-lab", "point": [106.80306, 10.87032, 0.6]},
+    {"state_id": 1004, "cell_space_id": 1007, "name": "Lecture Room Point", "type": "lecture-room", "point": [106.80305, 10.87064, 4.6]},
+    {"state_id": 1005, "cell_space_id": 1005, "name": "Faculty Office Point", "type": "faculty-office", "point": [106.80288, 10.87012, 4.6]},
+    {"state_id": 1006, "cell_space_id": 1006, "name": "Meeting Room Point", "type": "meeting-room", "point": [106.80306, 10.87032, 4.6]},
+    {"state_id": 1007, "cell_space_id": 1008, "name": "Self-study Point", "type": "self-study", "point": [106.80275, 10.87034, 4.6]}
+  ],
+  "transitions": [
+    {"transition_id": 1001, "from_state_id": 1001, "to_state_id": 1002, "type": "hallway", "distance_m": 32},
+    {"transition_id": 1002, "from_state_id": 1002, "to_state_id": 1003, "type": "hallway", "distance_m": 40},
+    {"transition_id": 1003, "from_state_id": 1003, "to_state_id": 1004, "type": "stairs", "distance_m": 24},
+    {"transition_id": 1004, "from_state_id": 1004, "to_state_id": 1005, "type": "hallway", "distance_m": 62},
+    {"transition_id": 1005, "from_state_id": 1005, "to_state_id": 1006, "type": "hallway", "distance_m": 40},
+    {"transition_id": 1006, "from_state_id": 1006, "to_state_id": 1007, "type": "hallway", "distance_m": 35}
+  ]
+}

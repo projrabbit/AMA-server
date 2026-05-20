@@ -1,0 +1,20 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    HR["HR / Admin"]
+    ARCGIS["ArcGIS Platform"]
+    P1("Tải thông tin tòa nhà và bản đồ")
+    P2("Xử lý geofence")
+    D6[(Geofence)]
+    D9[(Tòa nhà và Tầng)]
+    D8[(Audit Log)]
+
+    P1 -->|"Truy vấn tòa nhà và tầng"| D9
+    D9 -->|"Dữ liệu tòa nhà và tầng"| P1
+    P1 -->|"Layer ID tòa nhà"| ARCGIS
+    ARCGIS -->|"Bản đồ 3D Scene View"| P1
+    P1 -->|"Danh sách tòa nhà và bản đồ"| HR
+    HR -->|"Thông tin geofence mới hoặc yêu cầu xóa"| P2
+    P2 -->|"Kiểm tra và lưu geofence"| D6
+    D6 -->|"Danh sách geofence hiện có"| P2
+    P2 -->|"Ghi audit log"| D8
+    P2 -->|"Kết quả xử lý geofence"| HR

@@ -1,0 +1,37 @@
+@startuml UC14_AuditLog
+title UC-14: Tra cứu Audit Log
+
+actor "Admin" as Admin
+participant "Web Dashboard" as Web
+participant "API Server" as API
+database "Database" as DB
+
+Admin -> Web : Vào mục "Audit Log"
+Web --> Admin : Form lọc:\n- actor (account_id / username)\n- action_type\n- khoảng thời gian (from, to)\n- target_entity
+
+Admin -> Web : Nhập điều kiện lọc → Tìm kiếm
+Web -> API : GET /audit-logs\n?actor=&action_type=&from=&to=&entity=
+
+API -> DB : SELECT AuditLog\nWHERE (điều kiện lọc)\nORDER BY created_at DESC\nLIMIT 100
+DB --> API : Danh sách log entries
+API --> Web : Log list
+
+alt Không tìm thấy
+    Web --> Admin : "Không có kết quả phù hợp"
+else Có kết quả
+    Web --> Admin : Bảng log:\naccount, action_type, target_entity,\ntarget_id, ip_address, created_at
+end
+
+Admin -> Web : Nhấp vào log entry → Xem chi tiết
+Web -> API : GET /audit-logs/{log_id}
+API -> DB : SELECT AuditLog WHERE log_id=?
+DB --> API : Log detail (payload JSON)
+API --> Web : Full log detail
+Web --> Admin : Hiển thị payload JSON đầy đủ
+
+note right of Admin
+  Log chỉ đọc.
+  Không có API DELETE/UPDATE cho AuditLog.
+end note
+
+@enduml

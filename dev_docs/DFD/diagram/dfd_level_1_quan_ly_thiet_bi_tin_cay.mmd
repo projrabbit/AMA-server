@@ -1,0 +1,16 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    ADM["Admin"]
+    P1("Quản lý thiết bị tin cậy")
+    D4[(Thiết bị)]
+    D2[(Nhân viên)]
+    D8[(Audit Log)]
+
+    ADM -->|"Yêu cầu đánh dấu hoặc thu hồi tin cậy"| P1
+    P1 -->|"Truy vấn danh sách thiết bị"| D4
+    D4 -->|"Danh sách thiết bị và trạng thái"| P1
+    P1 -->|"Tra cứu thông tin nhân viên"| D2
+    D2 -->|"Thông tin nhân viên"| P1
+    P1 -->|"Cập nhật trạng thái tin cậy"| D4
+    P1 -->|"Ghi audit log"| D8
+    P1 -->|"Kết quả cập nhật"| ADM

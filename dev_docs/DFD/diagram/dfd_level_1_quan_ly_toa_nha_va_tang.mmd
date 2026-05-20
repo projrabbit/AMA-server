@@ -1,0 +1,15 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    ADM["Admin"]
+    ARCGIS["ArcGIS Platform"]
+    P1("Quản lý tòa nhà và tầng")
+    D9[(Tòa nhà và Tầng)]
+    D8[(Audit Log)]
+
+    ADM -->|"Thông tin tòa nhà và tầng mới"| P1
+    P1 -->|"Xác thực Layer ID"| ARCGIS
+    ARCGIS -->|"Kết quả xác thực layer"| P1
+    P1 -->|"Lưu tòa nhà và tầng"| D9
+    D9 -->|"Danh sách tòa nhà và tầng"| P1
+    P1 -->|"Ghi audit log"| D8
+    P1 -->|"Kết quả xử lý"| ADM

@@ -1,0 +1,12 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    ND["Người dùng"]
+    P1("Xác thực tài khoản")
+    D1[(Tài khoản)]
+    D8[(Audit Log)]
+
+    ND -->|"Tên đăng nhập và mật khẩu"| P1
+    P1 -->|"Truy vấn tài khoản"| D1
+    D1 -->|"Thông tin tài khoản"| P1
+    P1 -->|"Ghi nhật ký đăng nhập"| D8
+    P1 -->|"JWT token và vai trò"| ND

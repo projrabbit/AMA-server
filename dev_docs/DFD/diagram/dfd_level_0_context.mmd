@@ -1,0 +1,19 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    NV["Nhân viên"]
+    HR["HR / Admin"]
+    CEO["CEO"]
+    ARCGIS["ArcGIS Platform"]
+    SYS("Hệ thống Chấm công Thông minh")
+
+    NV -->|"Yêu cầu check-in / check-out"| SYS
+    SYS -->|"Kết quả chấm công"| NV
+
+    HR -->|"Cấu hình geofence, ca, nhân viên"| SYS
+    SYS -->|"Báo cáo, bản đồ GIS 3D, cảnh báo"| HR
+
+    CEO -->|"Yêu cầu xem báo cáo, dashboard"| SYS
+    SYS -->|"Dashboard KPI, báo cáo tổng hợp"| CEO
+
+    SYS -->|"Tọa độ marker, Layer ID"| ARCGIS
+    ARCGIS -->|"Bản đồ 3D Scene View"| SYS

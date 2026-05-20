@@ -1,0 +1,27 @@
+@startuml UC01_Login
+title UC-01: Đăng nhập hệ thống
+
+actor "Người dùng\n(NV / HR / Admin)" as User
+participant "Mobile App /\nWeb Dashboard" as Client
+participant "API Server" as API
+database "Database" as DB
+
+User -> Client : Nhập username + password
+Client -> API : POST /auth/login\n{username, password}
+API -> DB : SELECT Account WHERE username=?\nAND is_active=TRUE
+DB --> API : Account record (password_hash, role)
+
+alt Tài khoản không tồn tại hoặc bị khóa
+    API --> Client : 401 Unauthorized\n"Tài khoản không hợp lệ hoặc đã bị khóa"
+    Client --> User : Hiển thị thông báo lỗi
+else Sai mật khẩu
+    API --> Client : 401 Unauthorized\n"Sai mật khẩu"
+    Client --> User : Hiển thị thông báo, cho phép thử lại
+else Đăng nhập thành công
+    API -> DB : UPDATE Account SET last_login_at = NOW()
+    API -> DB : INSERT AuditLog (LOGIN, account_id)
+    API --> Client : 200 OK {jwt_token, role}
+    Client --> User : Điều hướng đến màn hình chính
+end
+
+@enduml

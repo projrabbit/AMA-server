@@ -1,0 +1,55 @@
+@startuml UC11_FraudDetection
+title UC-11: Phát hiện gian lận + xác minh gương mặt (Auto)
+
+participant "API Server" as API
+participant "Fraud Service" as Fraud
+participant "Face Verification\nService" as Face
+database "Database" as DB
+
+note over API, DB
+  Được kích hoạt tự động trong UC-02 / UC-03
+  sau khi nhận yêu cầu check-in/check-out
+end note
+
+API -> Fraud : checkFraud(employee_id, device_fingerprint,\nlat, lng, altitude, gps_accuracy,\nface_image, liveness_signals, raw_signals)
+
+== Kiểm tra Mock Location ==
+Fraud -> Fraud : Đọc cờ mock_location từ OS\n(Android: Location.isFromMockProvider()\niOS: CLLocation flags)
+Fraud -> Fraud : mock_location_detected = true/false
+
+== Kiểm tra GPS Spoofing ==
+Fraud -> DB : SELECT 3 vị trí check-in gần nhất\ncủa employee_id
+DB --> Fraud : Lịch sử vị trí gần đây
+Fraud -> Fraud : Phân tích tốc độ dịch chuyển\n(speed = distance / time_delta)
+Fraud -> Fraud : gps_spoofing_detected =\n(speed > 300 km/h OR\ngps_accuracy < 0 OR\naltitude bất thường)
+
+== Kiểm tra thiết bị lạ ==
+Fraud -> DB : SELECT Device WHERE device_fingerprint=?\nAND employee_id=?
+DB --> Fraud : Device record (is_trusted)
+Fraud -> Fraud : unknown_device =\n(device not found OR is_trusted=FALSE)
+
+== Xác minh gương mặt + liveness ==
+Fraud -> DB : SELECT face_template\nFROM Employee WHERE employee_id=?
+DB --> Fraud : face_template (encrypted)
+Fraud -> Face : verifyFace(face_image, face_template,\nliveness_signals)
+Face --> Fraud : {face_match_score, liveness_score,\nface_matched, liveness_passed}
+Fraud -> Fraud : face_mismatch_detected = (face_matched = FALSE)
+Fraud -> Fraud : liveness_failed = (liveness_passed = FALSE)
+
+== Tính confidence score ==
+Fraud -> Fraud : score = 100\n- mock_location_detected? score -= 50\n- gps_spoofing_detected? score -= 40\n- unknown_device? score -= 20\n- face_mismatch_detected? score -= 45\n- liveness_failed? score -= 60\n(capped at 0)
+
+Fraud --> API : FraudResult {\n  mock_location_detected,\n  gps_spoofing_detected,\n  face_mismatch_detected,\n  liveness_failed,\n  buddy_punch_suspected: false,\n  unknown_device,\n  face_match_score,\n  liveness_score,\n  confidence_score,\n  raw_signals\n}
+
+API -> DB : INSERT FraudDetection\n(record_id, flags, confidence_score,\nface_match_score, liveness_score,\nraw_signals, checked_at)
+
+alt liveness_failed = TRUE OR confidence_score < 40 (gian lận rõ ràng)
+    API -> API : status = 'rejected'\nrejection_reason = 'fraud_detected'
+else confidence_score 40-70 (vùng xám)
+    API -> API : status = 'approved'\n(ghi nhận nghi ngờ cho HR xem xét)
+    API -> DB : INSERT AuditLog\n(FRAUD_SUSPECTED, HR notified)
+else confidence_score > 70 (tin cậy)
+    API -> API : status dựa theo kiểm tra geofence
+end
+
+@enduml

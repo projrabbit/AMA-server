@@ -1,0 +1,37 @@
+@startuml UC05_Notification
+title UC-05: Nhận thông báo trạng thái chấm công
+
+note over NV, App
+  UC-05 là phần response trực tiếp của UC-02 / UC-03.
+  Sơ đồ này mô tả chi tiết phần phản hồi thông báo.
+end note
+
+actor "Nhân viên" as NV
+participant "Mobile App" as App
+participant "API Server" as API
+
+App -> API : POST /attendance/check-in (hoặc check-out)
+note right of API : Xử lý theo UC-02 / UC-03
+
+alt Chấm công thành công
+    API --> App : 200 {\n  status: "approved",\n  message: "Chấm công thành công",\n  location: "Tầng 3 – Tòa nhà A",\n  timestamp: "2024-...",\n  response_ms: 1200\n}
+    App --> NV : Toast notification:\n✅ "Chấm công thành công – Tầng 3, Tòa nhà A"
+
+else Ngoài geofence
+    API --> App : 200 {\n  status: "rejected",\n  reason: "outside_geofence",\n  message: "Bạn đang ngoài vùng cho phép"\n}
+    App --> NV : Toast notification:\n❌ "Ngoài vùng geofence"
+
+else Phát hiện gian lận
+    API --> App : 200 {\n  status: "rejected",\n  reason: "mock_location",\n  message: "Phát hiện vị trí giả"\n}
+    App --> NV : Toast notification:\n❌ "Chấm công bị từ chối: vị trí không hợp lệ"
+
+else Timeout / lỗi mạng
+    App -> App : Timeout sau 10 giây
+    App --> NV : Toast notification:\n⚠️ "Lỗi kết nối, vui lòng thử lại"
+end
+
+note right of NV
+  Mục tiêu phản hồi: < 5 giây
+end note
+
+@enduml

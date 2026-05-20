@@ -1,0 +1,48 @@
+@startuml UC12_BuddyPunch
+title UC-12: Phát hiện chấm công hộ (Buddy Punching) (Auto)
+
+participant "API Server" as API
+participant "Fraud Service" as Fraud
+database "Database" as DB
+
+note over API, DB
+  Chạy song song với UC-11 trong quy trình check-in/check-out
+  Xác minh gương mặt/liveness được xử lý trong UC-11.
+end note
+
+API -> Fraud : checkBuddyPunch(device_fingerprint, employee_id,\nlat, lng, timestamp)
+
+== Kiểm tra thiết bị dùng cho nhiều tài khoản ==
+Fraud -> DB : SELECT DISTINCT employee_id\nFROM AttendanceRecord ar\nJOIN Device d ON ar.device_id = d.device_id\nWHERE d.device_fingerprint = ?\nAND ar.timestamp > NOW() - INTERVAL '1 hour'
+DB --> Fraud : Danh sách employee_id dùng thiết bị này
+
+alt Thiết bị đã dùng cho employee khác trong 1 giờ
+    Fraud -> Fraud : buddy_punch_suspected = TRUE
+    Fraud -> Fraud : reason = "device_shared"
+else Thiết bị chỉ dùng cho 1 employee
+    Fraud -> Fraud : buddy_punch_suspected = FALSE
+end
+
+== Kiểm tra vị trí bất thường so với lần trước ==
+Fraud -> DB : SELECT lat, lng, timestamp\nFROM AttendanceRecord\nWHERE employee_id = ?\nORDER BY timestamp DESC LIMIT 1
+DB --> Fraud : Vị trí check-in gần nhất
+
+Fraud -> Fraud : Tính khoảng cách và thời gian\ngiữa 2 lần chấm công\nspeed = distance / time_delta
+
+alt Tốc độ dịch chuyển không thực tế (> 200 km/h)
+    Fraud -> Fraud : buddy_punch_suspected = TRUE
+    Fraud -> Fraud : reason = "impossible_travel"
+end
+
+Fraud --> API : {buddy_punch_suspected, reason}
+
+alt buddy_punch_suspected = TRUE
+    API -> DB : UPDATE FraudDetection\nSET buddy_punch_suspected = TRUE
+    API -> DB : INSERT AuditLog\n(BUDDY_PUNCH_ALERT,\ntarget=AttendanceRecord)
+    note right of API
+      Không tự động reject.
+      Ghi nhận để HR xem xét qua UC-10.
+    end note
+end
+
+@enduml

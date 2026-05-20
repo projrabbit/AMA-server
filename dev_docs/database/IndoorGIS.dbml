@@ -1,0 +1,102 @@
+Project Indoor_GIS_DB {
+  database_type: "PostgreSQL"
+}
+
+Table building {
+  building_id int [pk, increment]
+  name varchar(255)
+  address varchar(500)
+  center_lat decimal(10,8)
+  center_lng decimal(11,8)
+  total_floors int
+  arcgis_layer_id varchar(100)
+}
+
+Table floor {
+  floor_id int [pk, increment]
+  building_id int [not null]
+  floor_number int
+  floor_name varchar(100)
+  altitude_min decimal(10,2)
+  altitude_max decimal(10,2)
+}
+
+Table cell_space {
+  cell_space_id int [pk, increment]
+  floor_id int [not null]
+  building_id int [not null]
+
+  name varchar(255)
+  address varchar(500)
+  center_lat decimal(10,8)
+  center_lng decimal(11,8)
+  total_floors int
+  arcgis_layer_id varchar(100)
+}
+
+Table cell_space_boundary {
+  boundary_id int [pk, increment]
+  cell_space_id int [not null]
+  boundary_type varchar(100)
+  boundary_geometry_type varchar(100)
+  description text
+}
+
+Table geofence_rule {
+  geofence_rule_id int [pk, increment]
+  cell_space_id int [not null]
+
+  allowed_radius_m decimal(10,2)
+  altitude_min decimal(10,2)
+  altitude_max decimal(10,2)
+  allow_checkin boolean
+  allow_checkout boolean
+  is_active boolean
+  created_by_account_id int
+}
+
+Table gis_layer {
+  layer_id int [pk, increment]
+  cell_space_id int [not null]
+
+  arcgis_layer_id varchar(100)
+  layer_type varchar(100)
+  layer_url text
+  is_visible boolean
+}
+
+Table state {
+  state_id int [pk, increment]
+  cell_space_id int [not null]
+
+  latitude decimal(10,8)
+  longitude decimal(11,8)
+  altitude decimal(10,2)
+  state_type varchar(100)
+}
+
+Table transition {
+  transition_id int [pk, increment]
+
+  from_state_id int [not null]
+  to_state_id int [not null] 
+
+  transition_type varchar(100)
+  distance_m decimal(10,2)
+}
+
+Ref: floor.building_id > building.building_id
+
+Ref: cell_space.floor_id > floor.floor_id
+Ref: cell_space.building_id > building.building_id
+
+Ref: cell_space_boundary.cell_space_id > cell_space.cell_space_id
+
+Ref: geofence_rule.cell_space_id > cell_space.cell_space_id
+
+Ref: gis_layer.cell_space_id > cell_space.cell_space_id
+
+Ref: state.cell_space_id > cell_space.cell_space_id
+
+Ref: transition.from_state_id > state.state_id
+Ref: transition.to_state_id > state.state_id
