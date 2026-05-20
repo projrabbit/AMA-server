@@ -19,6 +19,7 @@ from sqlalchemy import (
     String,
     Text,
     Time,
+    UniqueConstraint,
     false,
     text,
     true,
@@ -159,7 +160,7 @@ class Employee(Base):
         foreign_keys="Department.manager_id",
     )
     account: Mapped[Account | None] = relationship(back_populates="employee", uselist=False)
-    device: Mapped[Device | None] = relationship(back_populates="employee", uselist=False)
+    devices: Mapped[list[Device]] = relationship(back_populates="employee")
     shifts: Mapped[list[Shift]] = relationship(back_populates="employee")
     attendance_records: Mapped[list[AttendanceRecord]] = relationship(back_populates="employee")
 
@@ -200,8 +201,13 @@ class Account(Base):
 class Device(Base):
     __tablename__ = "device"
     __table_args__ = (
-        Index("ix_business_device_employee_id", "employee_id", unique=True),
-        Index("ix_business_device_device_fingerprint", "device_fingerprint", unique=True),
+        UniqueConstraint(
+            "employee_id",
+            "device_fingerprint",
+            name="uq_business_device_employee_fingerprint",
+        ),
+        Index("ix_business_device_employee_id", "employee_id"),
+        Index("ix_business_device_device_fingerprint", "device_fingerprint"),
         Index("ix_business_device_platform", "platform"),
         Index("ix_business_device_is_trusted", "is_trusted"),
         {"schema": BUSINESS_SCHEMA},
@@ -219,14 +225,16 @@ class Device(Base):
     device_fingerprint: Mapped[str] = mapped_column(String(255), nullable=False)
     platform: Mapped[DevicePlatform] = mapped_column(device_platform_enum, nullable=False)
     model: Mapped[str | None] = mapped_column(String(100))
-    register_at: Mapped[datetime] = mapped_column(
+    os_version: Mapped[str | None] = mapped_column(String(100))
+    app_version: Mapped[str | None] = mapped_column(String(50))
+    registered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=text("CURRENT_TIMESTAMP"),
     )
     is_trusted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
 
-    employee: Mapped[Employee] = relationship(back_populates="device")
+    employee: Mapped[Employee] = relationship(back_populates="devices")
     attendance_records: Mapped[list[AttendanceRecord]] = relationship(back_populates="device")
 
 
@@ -411,6 +419,7 @@ class AuditLog(Base):
     target_entity: Mapped[str] = mapped_column(String(100), nullable=False)
     target_id: Mapped[int | None] = mapped_column(Integer)
     payload: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    ip_address: Mapped[str | None] = mapped_column(String(45))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
