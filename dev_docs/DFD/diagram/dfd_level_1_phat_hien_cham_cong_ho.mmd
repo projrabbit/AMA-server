@@ -1,0 +1,22 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    SYS["Hệ thống"]
+    P1("Kiểm tra dùng chung thiết bị")
+    P2("Kiểm tra tốc độ di chuyển")
+    P3("Ghi nhận nghi ngờ chấm công hộ")
+    D3[(Bản ghi chấm công)]
+    D4[(Thiết bị)]
+    D7[(Phát hiện gian lận)]
+    D8[(Audit Log)]
+
+    SYS -->|"Thiết bị, nhân viên, tọa độ"| P1
+    P1 -->|"Truy vấn lịch sử dùng thiết bị"| D4
+    D4 -->|"Danh sách nhân viên dùng thiết bị"| P1
+    SYS -->|"Tọa độ và thời điểm"| P2
+    P2 -->|"Tra cứu vị trí chấm công gần nhất"| D3
+    D3 -->|"Vị trí và thời gian gần nhất"| P2
+    P1 -->|"Kết quả kiểm tra thiết bị"| P3
+    P2 -->|"Kết quả kiểm tra tốc độ"| P3
+    P3 -->|"Cập nhật kết quả gian lận"| D7
+    P3 -->|"Ghi cảnh báo"| D8
+    P3 -->|"Kết quả nghi ngờ chấm công hộ"| SYS

@@ -1,0 +1,56 @@
+@startuml UC15_ManageEmployee
+title UC-15: Quản lý nhân viên & phòng ban
+
+actor "Admin / HR" as Admin
+participant "Web Dashboard" as Web
+participant "API Server" as API
+database "Database" as DB
+
+== Tạo nhân viên mới ==
+
+Admin -> Web : Vào "Quản lý Nhân viên" → "Thêm mới"
+Admin -> Web : Nhập: full_name, department_id,\nposition, email, phone, hire_date
+
+Web -> API : POST /employees\n{full_name, department_id, position,\nemail, phone, hire_date}
+
+API -> DB : CHECK email UNIQUE
+DB --> API : Kết quả kiểm tra
+
+alt Email trùng
+    API --> Web : 409 Conflict\n"Email đã tồn tại"
+    Web --> Admin : Hiển thị lỗi
+else Email hợp lệ
+    API -> DB : INSERT Employee (status='active')
+    API -> DB : INSERT Account\n(employee_id, username=email,\npassword_hash=bcrypt(temp),\nrole='employee', is_active=TRUE)
+    API -> DB : INSERT AuditLog (EMPLOYEE_CREATE)
+    API --> Web : 201 Created {employee_id, account_id}
+    Web --> Admin : Tạo thành công
+end
+
+== Cập nhật thông tin ==
+
+Admin -> Web : Chọn nhân viên → Sửa → Lưu
+Web -> API : PUT /employees/{id}\n{updated fields}
+API -> DB : UPDATE Employee
+API -> DB : INSERT AuditLog (EMPLOYEE_UPDATE)
+API --> Web : 200 OK
+
+== Vô hiệu hóa nhân viên ==
+
+Admin -> Web : Chọn nhân viên → "Vô hiệu hóa"
+Web -> API : PUT /employees/{id}/deactivate
+API -> DB : UPDATE Employee SET status='inactive'
+API -> DB : UPDATE Account SET is_active=FALSE\nWHERE employee_id=?
+API -> DB : INSERT AuditLog (EMPLOYEE_DEACTIVATE)
+API --> Web : 200 OK
+Web --> Admin : Tài khoản đã bị vô hiệu hóa
+
+== Quản lý phòng ban ==
+
+Admin -> Web : Tạo / Sửa Department
+Web -> API : POST /departments hoặc PUT /departments/{id}
+API -> DB : INSERT / UPDATE Department
+API -> DB : INSERT AuditLog
+API --> Web : 200/201 OK
+
+@enduml

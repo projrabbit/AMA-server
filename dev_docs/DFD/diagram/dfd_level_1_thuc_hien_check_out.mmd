@@ -1,0 +1,25 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    NV["Nhân viên"]
+    P1("Tiếp nhận yêu cầu check-out")
+    P2("Kiểm tra hợp lệ")
+    P3("Ghi nhận chấm công")
+    D3[(Bản ghi chấm công)]
+    D5[(Ca làm việc)]
+    D6[(Geofence)]
+    D7[(Phát hiện gian lận)]
+    D8[(Audit Log)]
+
+    NV -->|"GPS, ảnh selfie, thiết bị"| P1
+    P1 -->|"Tìm bản ghi check-in"| D3
+    D3 -->|"Bản ghi check-in gần nhất"| P1
+    P1 -->|"Tra cứu ca làm việc"| D5
+    D5 -->|"Thông tin ca làm việc"| P1
+    P1 -->|"Dữ liệu GPS và thiết bị"| P2
+    P2 -->|"Kiểm tra geofence"| D6
+    D6 -->|"Vùng geofence hợp lệ"| P2
+    P2 -->|"Lưu kết quả kiểm tra"| D7
+    P2 -->|"Kết quả kiểm tra"| P3
+    P3 -->|"Lưu bản ghi check-out"| D3
+    P3 -->|"Ghi audit log"| D8
+    P3 -->|"Kết quả check-out"| NV

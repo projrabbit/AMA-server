@@ -1,0 +1,37 @@
+@startuml UC09_Report
+title UC-09: Xem và xuất báo cáo chấm công
+
+actor "HR / Admin / CEO" as HR
+participant "Web Dashboard" as Web
+participant "API Server" as API
+database "Database" as DB
+
+HR -> Web : Vào mục "Báo cáo"
+HR -> Web : Chọn bộ lọc:\n- Khoảng thời gian (from, to)\n- Phòng ban (optional)\n- Nhân viên (optional)
+
+Web -> API : GET /reports/attendance\n?from=&to=&dept_id=&employee_id=
+
+API -> DB : SELECT AttendanceRecord + Employee\nWHERE điều kiện lọc
+DB --> API : Raw attendance records
+
+API -> API : Tổng hợp:\n- Số ngày công\n- Tổng giờ làm\n- Số lần trễ / về sớm\n- Số lần vắng mặt\n- Số bản ghi bị từ chối
+
+alt Không có dữ liệu
+    API --> Web : 200 {records: [], summary: empty}
+    Web --> HR : Hiển thị "Không có dữ liệu"
+else Có dữ liệu
+    API --> Web : 200 {summary: {...}, records: [...]}
+    Web --> HR : Hiển thị bảng báo cáo
+end
+
+== Xuất file ==
+
+HR -> Web : Nhấn "Xuất Excel" hoặc "Xuất PDF"
+Web -> API : GET /reports/attendance/export\n?format=excel&from=&to=&...
+API -> DB : SELECT (tương tự query trên)
+DB --> API : Records
+API -> API : Tạo file Excel / PDF\n(Apache POI / jsPDF)
+API --> Web : File stream (application/octet-stream)
+Web --> HR : Tải file về máy
+
+@enduml

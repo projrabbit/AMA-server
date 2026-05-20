@@ -1,0 +1,32 @@
+@startuml UC16_Dashboard
+title UC-16: Xem Dashboard tổng quan (CEO / HR / Admin)
+
+actor "CEO / HR / Admin" as User
+participant "Web Dashboard" as Web
+participant "API Server" as API
+database "Database" as DB
+
+User -> Web : Đăng nhập thành công\n→ Trang Dashboard hiển thị
+
+Web -> API : GET /dashboard/summary
+API -> DB : -- KPI ngày hôm nay --\nSELECT COUNT(*) total_employees FROM Employee\nWHERE status='active'
+API -> DB : SELECT COUNT(DISTINCT employee_id)\nFROM AttendanceRecord\nWHERE type='check_in' AND DATE(timestamp)=TODAY
+API -> DB : SELECT COUNT(*) checked_in_count,\nSUM(CASE WHEN is_late THEN 1 ELSE 0 END) late_count\nFROM AttendanceRecord\nWHERE DATE(timestamp)=TODAY
+API -> DB : SELECT COUNT(*) fraud_alerts\nFROM FraudDetection fd\nJOIN AttendanceRecord ar ON fd.record_id=ar.record_id\nWHERE DATE(ar.timestamp)=TODAY\nAND (mock_location_detected OR gps_spoofing_detected\nOR buddy_punch_suspected)
+DB --> API : Aggregated KPIs
+
+API -> DB : SELECT lat, lng, altitude, employee_id\nFROM AttendanceRecord\nWHERE type='check_in' AND status='approved'\nAND DATE(timestamp)=TODAY\nAND (chưa check_out)
+DB --> API : Active employee locations
+
+API --> Web : {\n  total_employees,\n  checked_in_today,\n  on_time_rate (%),\n  fraud_alerts_today,\n  active_locations: [...]\n}
+
+Web --> User : Hiển thị Dashboard:\n- KPI cards\n- Mini bản đồ vị trí nhân viên\n- Biểu đồ tỷ lệ đúng giờ
+
+== Auto refresh ==
+loop Mỗi 60 giây
+    Web -> API : GET /dashboard/summary
+    API --> Web : Updated data
+    Web --> User : Cập nhật Dashboard
+end
+
+@enduml

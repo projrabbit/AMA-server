@@ -1,0 +1,16 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    ND["CEO / HR / Admin"]
+    P1("Tổng hợp dữ liệu dashboard")
+    D2[(Nhân viên)]
+    D3[(Bản ghi chấm công)]
+    D7[(Phát hiện gian lận)]
+
+    ND -->|"Yêu cầu xem dashboard"| P1
+    P1 -->|"Truy vấn tổng nhân viên active"| D2
+    D2 -->|"Tổng nhân viên active"| P1
+    P1 -->|"Truy vấn bản ghi chấm công hôm nay"| D3
+    D3 -->|"Số check-in, trễ, vị trí nhân viên"| P1
+    P1 -->|"Truy vấn cảnh báo gian lận"| D7
+    D7 -->|"Số cảnh báo gian lận hôm nay"| P1
+    P1 -->|"KPI, vị trí nhân viên, biểu đồ"| ND

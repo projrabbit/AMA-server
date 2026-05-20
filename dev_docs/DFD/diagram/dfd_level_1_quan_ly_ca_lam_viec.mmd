@@ -1,0 +1,14 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    HR["HR / Admin"]
+    P1("Quản lý ca làm việc")
+    D5[(Ca làm việc)]
+    D2[(Nhân viên)]
+    D8[(Audit Log)]
+
+    HR -->|"Thông tin ca mới hoặc yêu cầu gán ca"| P1
+    P1 -->|"Kiểm tra và lưu ca làm việc"| D5
+    D5 -->|"Danh sách ca hiện có"| P1
+    P1 -->|"Cập nhật gán ca"| D2
+    P1 -->|"Ghi audit log"| D8
+    P1 -->|"Kết quả xử lý ca"| HR

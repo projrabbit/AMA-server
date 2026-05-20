@@ -1,0 +1,40 @@
+@startuml UC13_ManageDevice
+title UC-13: Quản lý thiết bị tin cậy
+
+actor "Admin" as Admin
+participant "Web Dashboard" as Web
+participant "API Server" as API
+database "Database" as DB
+
+Admin -> Web : Vào mục "Quản lý Thiết bị"
+Web -> API : GET /devices?employee_id= (optional)
+API -> DB : SELECT Device LEFT JOIN Employee
+DB --> API : Danh sách Device + thông tin nhân viên
+API --> Web : Device list
+Web --> Admin : Hiển thị: thiết bị, nhân viên,\nplatform, model, is_trusted,\nregistered_at
+
+== Cấp quyền tin cậy ==
+
+Admin -> Web : Chọn thiết bị → "Đánh dấu Tin cậy"
+Web -> API : PUT /devices/{device_id}/trust\n{is_trusted: true}
+API -> DB : UPDATE Device\nSET is_trusted = TRUE
+API -> DB : INSERT AuditLog (DEVICE_TRUST)
+API --> Web : 200 OK
+Web --> Admin : Thiết bị đã được tin cậy
+
+== Thu hồi quyền tin cậy ==
+
+Admin -> Web : Chọn thiết bị → "Thu hồi tin cậy"
+Web -> API : PUT /devices/{device_id}/trust\n{is_trusted: false}
+API -> DB : UPDATE Device\nSET is_trusted = FALSE
+API -> DB : INSERT AuditLog (DEVICE_UNTRUST)
+API --> Web : 200 OK
+Web --> Admin : Đã thu hồi tin cậy
+
+note right of Admin
+  Từ check-in tiếp theo, thiết bị này
+  sẽ kích hoạt unknown_device=TRUE
+  trong FraudDetection (UC-11)
+end note
+
+@enduml

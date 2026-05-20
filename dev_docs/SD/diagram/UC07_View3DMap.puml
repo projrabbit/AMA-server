@@ -1,0 +1,42 @@
+@startuml UC07_View3DMap
+title UC-07: Xem bản đồ GIS 3D real-time
+
+actor "Admin / HR" as Admin
+participant "Web Dashboard" as Web
+participant "ArcGIS\nScene View" as GIS
+participant "API Server" as API
+database "Database" as DB
+
+Admin -> Web : Mở tab "Bản đồ 3D"
+Web -> GIS : Khởi tạo ArcGIS SceneView\n(load arcgis_layer_id của các tòa nhà)
+GIS --> Web : Scene View sẵn sàng
+
+Web -> API : GET /realtime/employees-location
+API -> DB : SELECT AttendanceRecord\nWHERE type=check_in AND status=approved\nAND DATE(timestamp)=TODAY\nAND chưa có check_out tương ứng
+DB --> API : Danh sách nhân viên đang làm\n{employee_id, lat, lng, altitude, floor, building}
+API --> Web : Employee location list
+
+Web -> GIS : Vẽ marker cho từng nhân viên\n(theo lat/lng/altitude)
+GIS --> Admin : Bản đồ 3D với markers nhân viên
+
+== Lọc theo tòa nhà / tầng / phòng ban ==
+
+Admin -> Web : Chọn bộ lọc (Building / Floor / Department)
+Web -> API : GET /realtime/employees-location\n?building_id=&floor_id=&dept_id=
+API -> DB : SELECT với điều kiện lọc
+DB --> API : Kết quả đã lọc
+API --> Web : Filtered employee list
+Web -> GIS : Cập nhật markers theo bộ lọc
+GIS --> Admin : Bản đồ được lọc
+
+== Auto refresh ==
+
+loop Mỗi 30 giây
+    Web -> API : GET /realtime/employees-location
+    API -> DB : SELECT (như trên)
+    DB --> API : Dữ liệu mới nhất
+    API --> Web : Updated locations
+    Web -> GIS : Cập nhật vị trí markers
+end
+
+@enduml

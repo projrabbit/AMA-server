@@ -1,0 +1,22 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    SYS["Hệ thống"]
+    P1("Phát hiện giả mạo vị trí GPS")
+    P2("Xác minh gương mặt và liveness")
+    P3("Tính điểm tin cậy và ghi kết quả")
+    D2[(Nhân viên)]
+    D4[(Thiết bị)]
+    D7[(Phát hiện gian lận)]
+
+    SYS -->|"Dữ liệu GPS, thiết bị, tín hiệu"| P1
+    P1 -->|"Tra cứu lịch sử vị trí"| D2
+    D2 -->|"Vị trí chấm công gần đây"| P1
+    P1 -->|"Kiểm tra thiết bị"| D4
+    D4 -->|"Trạng thái thiết bị"| P1
+    SYS -->|"Ảnh gương mặt và liveness"| P2
+    P2 -->|"Lấy khuôn mặt mẫu"| D2
+    D2 -->|"Khuôn mặt mẫu"| P2
+    P1 -->|"Cờ GPS và thiết bị"| P3
+    P2 -->|"Điểm khớp gương mặt"| P3
+    P3 -->|"Lưu kết quả kiểm tra"| D7
+    P3 -->|"Kết quả và điểm tin cậy"| SYS

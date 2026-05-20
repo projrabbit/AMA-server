@@ -1,0 +1,18 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    ND["HR / Admin / CEO"]
+    P1("Tổng hợp báo cáo chấm công")
+    P2("Xuất file báo cáo")
+    D3[(Bản ghi chấm công)]
+    D2[(Nhân viên)]
+
+    ND -->|"Điều kiện lọc báo cáo"| P1
+    P1 -->|"Truy vấn bản ghi chấm công"| D3
+    D3 -->|"Dữ liệu chấm công"| P1
+    P1 -->|"Truy vấn thông tin nhân viên"| D2
+    D2 -->|"Thông tin nhân viên"| P1
+    P1 -->|"Bảng báo cáo tổng hợp"| ND
+    ND -->|"Yêu cầu xuất Excel hoặc PDF"| P2
+    P2 -->|"Truy vấn dữ liệu để xuất"| D3
+    D3 -->|"Dữ liệu để xuất"| P2
+    P2 -->|"File báo cáo"| ND

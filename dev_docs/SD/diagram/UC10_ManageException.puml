@@ -1,0 +1,38 @@
+@startuml UC10_ManageException
+title UC-10: Quản lý ngoại lệ chấm công
+
+actor "HR / Admin" as HR
+participant "Web Dashboard" as Web
+participant "API Server" as API
+database "Database" as DB
+
+HR -> Web : Vào mục "Ngoại lệ"
+Web -> API : GET /attendance/exceptions\n(status=rejected OR is_late=TRUE\nOR is_early_leave=TRUE)
+API -> DB : SELECT AttendanceRecord\nWHERE status='rejected'\nOR is_late=TRUE\nOR is_early_leave=TRUE\nORDER BY timestamp DESC
+DB --> API : Danh sách ngoại lệ
+API --> Web : Exception list
+Web --> HR : Hiển thị danh sách bất thường
+
+HR -> Web : Chọn bản ghi → Xem chi tiết
+Web -> API : GET /attendance/{record_id}
+API -> DB : SELECT AttendanceRecord + FraudDetection
+DB --> API : Chi tiết bản ghi + fraud info
+API --> Web : Record detail
+Web --> HR : Hiển thị: lý do từ chối,\ntọa độ, kết quả FraudDetection,\ncác cờ gian lận
+
+== Phê duyệt thủ công ==
+
+alt HR phê duyệt
+    HR -> Web : Nhấn "Phê duyệt thủ công"
+    Web -> API : PUT /attendance/{record_id}/approve
+    API -> DB : UPDATE AttendanceRecord\nSET status='approved',\nrejection_reason=NULL
+    API -> DB : INSERT AuditLog (MANUAL_APPROVE)
+    API --> Web : 200 OK
+    Web --> HR : Đã phê duyệt
+
+else HR từ chối (giữ nguyên)
+    HR -> Web : Nhấn "Giữ nguyên từ chối"
+    Web --> HR : Không thay đổi trạng thái
+end
+
+@enduml

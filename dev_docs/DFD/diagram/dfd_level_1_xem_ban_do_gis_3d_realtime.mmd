@@ -1,0 +1,16 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    HR["HR / Admin"]
+    ARCGIS["ArcGIS Platform"]
+    P1("Tải bản đồ 3D và vị trí nhân viên")
+    D3[(Bản ghi chấm công)]
+    D9[(Tòa nhà và Tầng)]
+
+    HR -->|"Yêu cầu xem bản đồ và bộ lọc"| P1
+    P1 -->|"Truy vấn vị trí nhân viên check-in"| D3
+    D3 -->|"Tọa độ và tầng nhân viên"| P1
+    P1 -->|"Truy vấn Layer ID tòa nhà"| D9
+    D9 -->|"Layer ID tòa nhà"| P1
+    P1 -->|"Dữ liệu marker và Layer ID"| ARCGIS
+    ARCGIS -->|"Bản đồ 3D với marker nhân viên"| P1
+    P1 -->|"Bản đồ 3D real-time"| HR

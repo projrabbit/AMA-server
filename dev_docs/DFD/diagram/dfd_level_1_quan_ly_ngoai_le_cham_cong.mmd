@@ -1,0 +1,19 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    HR["HR / Admin"]
+    P1("Xem danh sách ngoại lệ")
+    P2("Phê duyệt thủ công")
+    D3[(Bản ghi chấm công)]
+    D7[(Phát hiện gian lận)]
+    D8[(Audit Log)]
+
+    HR -->|"Yêu cầu xem ngoại lệ"| P1
+    P1 -->|"Truy vấn bản ghi bất thường"| D3
+    D3 -->|"Danh sách bản ghi ngoại lệ"| P1
+    P1 -->|"Danh sách ngoại lệ"| HR
+    HR -->|"Chọn bản ghi và quyết định"| P2
+    P2 -->|"Truy vấn chi tiết gian lận"| D7
+    D7 -->|"Chi tiết kết quả gian lận"| P2
+    P2 -->|"Cập nhật trạng thái bản ghi"| D3
+    P2 -->|"Ghi audit log"| D8
+    P2 -->|"Kết quả xử lý"| HR

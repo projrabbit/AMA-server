@@ -1,0 +1,59 @@
+@startuml UC02_CheckIn
+title UC-02: Thực hiện Check-in
+
+actor "Nhân viên" as NV
+participant "Mobile App" as App
+participant "API Server" as API
+participant "Fraud\nDetection" as Fraud
+database "Database" as DB
+
+note over API, Fraud
+    Chi tiết kiểm tra fraud, flags, confidence_score
+    (bao gồm face verification) và lưu
+    FraudDetection tham chiếu UC-11.
+end note
+
+NV -> App : Nhấn nút Check-in
+App -> App : Thu tọa độ GPS\n(lat, lng, altitude, accuracy)
+App -> App : Chụp selfie + kiểm tra liveness\n(face_image, liveness_signals)
+App -> API : POST /attendance/check-in\n{employee_id, device_fingerprint,\nlat, lng, altitude, gps_accuracy,\nface_image, liveness_signals}
+
+API -> DB : SELECT Employee, Device, Shift\n(xác thực device, lấy default_shift)
+DB --> API : Employee + Shift + Device info
+
+API -> Fraud : checkFraud(employee_id, device_fingerprint,\nlat, lng, altitude, gps_accuracy,\nface_image, liveness_signals)
+Fraud --> API : FraudResult\n{confidence_score, flags}
+
+API -> DB : SELECT Geofence active\nphù hợp với altitude
+DB --> API : Danh sách Geofence
+
+API -> API : Kiểm tra điều kiện check-in\n(gps_accuracy, geofence, fraud_score)
+
+alt GPS accuracy kém (>50m)
+    API -> DB : INSERT AuditLog (CHECK_IN_FAILED_GPS)
+    API --> App : Kết quả check-in: failed_gps_accuracy
+
+else Phát hiện gian lận (theo UC-11, gồm face mismatch/liveness fail)
+    API -> DB : INSERT AttendanceRecord\n(type=check_in, status=rejected,\nrejection_reason=fraud_detected)
+    API -> DB : INSERT AuditLog (CHECK_IN_REJECTED_FRAUD)
+    API --> App : Kết quả check-in: rejected
+
+else Ngoài geofence
+    API -> DB : INSERT AttendanceRecord\n(type=check_in, status=rejected,\nrejection_reason=outside_geofence)
+    API -> DB : INSERT AuditLog (CHECK_IN_REJECTED_GEOFENCE)
+    API --> App : Kết quả check-in: rejected
+
+else Hợp lệ
+    API -> API : Tính is_late\n(timestamp vs shift.start_time)
+    API -> DB : INSERT AttendanceRecord\n(type=check_in, status=approved,\ngeofence_id, shift_id, is_late)
+    API -> DB : INSERT AuditLog (CHECK_IN_APPROVED)
+    API --> App : Kết quả check-in: approved
+end
+
+App --> NV : Hiển thị thông báo trạng thái
+note right of App
+  Chi tiết payload response/toast
+  tham chiếu UC-05.
+end note
+
+@enduml

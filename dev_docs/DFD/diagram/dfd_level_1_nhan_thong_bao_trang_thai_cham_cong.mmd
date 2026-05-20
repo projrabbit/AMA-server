@@ -1,0 +1,12 @@
+%%{init: {"theme": "default", "securityLevel": "loose", "flowchart": {"htmlLabels": false}, "themeCSS": ".edgeLabel, .edgeLabel span, .edgeLabel p, .edgeLabel div { background: transparent !important; background-color: transparent !important; } .edgeLabel rect, .labelBkg, .edgeLabel .labelBkg { fill: transparent !important; stroke: transparent !important; opacity: 0 !important; }"}}%%
+flowchart LR
+    NV["Nhân viên"]
+    P1("Xử lý yêu cầu chấm công")
+    P2("Gửi thông báo kết quả")
+    D3[(Bản ghi chấm công)]
+
+    NV -->|"Yêu cầu check-in hoặc check-out"| P1
+    P1 -->|"Lưu bản ghi chấm công"| D3
+    D3 -->|"Trạng thái bản ghi"| P1
+    P1 -->|"Kết quả xử lý"| P2
+    P2 -->|"Thông báo trạng thái"| NV
