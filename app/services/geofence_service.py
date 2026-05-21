@@ -41,7 +41,11 @@ from app.schemas.geofence import (
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _validate_arcgis_layer(arcgis_layer_id: str | None) -> None:
-    # TODO: replace with real ArcGIS REST API validation when available
+    """Stub validation: rejects only empty/whitespace IDs.
+
+    A real ArcGIS REST round-trip (probe the layer's `/MapServer/{id}` URL)
+    is deferred. See `dev_docs/arcgis_validation.md` for the spec.
+    """
     if not arcgis_layer_id or not arcgis_layer_id.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

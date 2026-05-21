@@ -3,6 +3,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
@@ -34,6 +35,17 @@ app = FastAPI(
         {"name": "health", "description": "Application status and metadata endpoints."},
         {"name": "api", "description": "Versioned AMA API routes."},
     ],
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1:8080",
+        "http://localhost:8080",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(api_router, prefix=API_V1_PREFIX, tags=["api"])

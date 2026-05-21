@@ -13,6 +13,7 @@ from app.schemas.auth import (
     MessageData,
     RefreshData,
     RefreshTokenRequest,
+    RegisterRequest,
 )
 from app.schemas.common import SuccessResponse
 from app.services import auth_service
@@ -23,6 +24,34 @@ router = APIRouter()
 
 def _client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
+
+
+@router.post(
+    "/register",
+    response_model=SuccessResponse[LoginData],
+    status_code=status.HTTP_201_CREATED,
+    summary="Register",
+    description=(
+        "Create a new Employee + Account in one call, then auto-login. "
+        "Demo-friendly: no auth required, role can be specified."
+    ),
+)
+def register(
+    body: RegisterRequest,
+    request: Request,
+    db: DbSession,
+) -> SuccessResponse[LoginData]:
+    data = auth_service.register(
+        db,
+        username=body.username,
+        password=body.password,
+        full_name=body.full_name,
+        email=body.email,
+        role=body.role,
+        department_name=body.department_name,
+        ip_address=_client_ip(request),
+    )
+    return SuccessResponse(data=data)
 
 
 @router.post(
