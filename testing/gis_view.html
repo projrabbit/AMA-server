@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Demo Office HCM - GIS 3D Viewer</title>
+    <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/dark/main.css" />
+    <script src="https://js.arcgis.com/4.30/"></script>
+    <style>
+      html, body, #viewDiv { height: 100%; margin: 0; width: 100%; }
+      body {
+        background: #07111f;
+        color: #f8fafc;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .panel {
+        background: rgba(7, 17, 31, 0.92);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        border-radius: 14px;
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+        left: 16px;
+        max-width: 420px;
+        padding: 16px;
+        position: absolute;
+        top: 16px;
+        z-index: 10;
+      }
+      .panel h1 { font-size: 18px; line-height: 1.25; margin: 0 0 8px; }
+      .panel p, .meta {
+        color: #cbd5e1;
+        font-size: 13px;
+        line-height: 1.45;
+        margin: 0 0 10px;
+      }
+      .kv { font-size: 12px; color: #cbd5e1; margin: 2px 0; }
+      .kv span { color: #f8fafc; font-weight: 600; }
+      .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+      button {
+        background: #38bdf8;
+        border: 0;
+        border-radius: 999px;
+        color: #07111f;
+        cursor: pointer;
+        font-weight: 700;
+        padding: 8px 12px;
+      }
+      button.secondary { background: rgba(148, 163, 184, 0.2); color: #f8fafc; }
+      #status { color: #93c5fd; font-size: 12px; margin-top: 12px; }
+      .src-badge {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+        margin-bottom: 8px;
+      }
+      .src-api      { background: #14532d; color: #bbf7d0; }
+      .src-fallback { background: #78350f; color: #fed7aa; }
+    </style>
+  </head>
+  <body>
+    <div id="viewDiv"></div>
+    <section class="panel">
+      <span id="srcBadge" class="src-badge src-fallback">DEMO FALLBACK</span>
+      <h1 id="bldName">Demo Office HCM</h1>
+      <p id="bldDesc">Two-floor demo building with 3 rooms per floor.</p>
+      <div class="meta" id="meta">
+        <div class="kv">Address: <span id="bldAddress">-</span></div>
+        <div class="kv">Latitude: <span id="bldLat">-</span></div>
+        <div class="kv">Longitude: <span id="bldLng">-</span></div>
+        <div class="kv">Floors: <span id="bldFloors">-</span></div>
+      </div>
+      <div class="buttons">
+        <button id="showAll">Whole Building</button>
+        <button id="floor1" class="secondary">Floor 1</button>
+        <button id="floor2" class="secondary">Floor 2</button>
+      </div>
+      <div id="status">Loading...</div>
+    </section>
+
+    <script>
+      // ─── Config ───────────────────────────────────────────────────────────
+      // Set these two if you want gis_view.html to fetch real data from the
+      // FastAPI backend. Leave API_TOKEN empty to skip the fetch and render
+      // the bundled fallback data instead.
+      const API_BASE  = "http://127.0.0.1:8000/api/v1";
+      // Paste a fresh access token from POST /api/v1/auth/login here to fetch
+      // live data. Leave empty to render the bundled fallback dataset (which
+      // matches testing/seed_gis_demo.py).
+      const API_TOKEN = "";
+      const TARGET_BUILDING_NAME = "Demo Office HCM";
+
+      // ─── Building footprint (Nha thi dau Phu Tho, Q.11) ───────────────────
+      // SHELL_POLYGON = full 7-vertex OSM polygon (way id 39598511-style) of
+      // the sports hall. Used for the 3D outer shell + per-floor slabs so the
+      // base lines up with the basemap polygon edge-for-edge.
+      //
+      // TILE_RECT = simplified 4-corner rotated rectangle (the polygon's main
+      // corners v1-v2-v3-v4), in SW -> SE -> NE -> NW -> SW order. Used by
+      // tileAlongWidth to split the floor into N parallel strips along the
+      // ~134 m long axis.
+      const SHELL_POLYGON = [
+        [106.6571353, 10.7694371], // v1 NW
+        [106.6574609, 10.7682719], // v2 SW
+        [106.6583599, 10.7685144], // v3 SE
+        [106.6580342, 10.7696795], // v4 NE
+        [106.6577337, 10.7695985], // v5 (north step)
+        [106.6574382, 10.7695188], // v6 (north step)
+        [106.6571353, 10.7694371], // close
+      ];
+      const TILE_RECT = [
+        [106.6574609, 10.7682719], // SW (= v2)
+        [106.6583599, 10.7685144], // SE (= v3)
+        [106.6580342, 10.7696795], // NE (= v4)
+        [106.6571353, 10.7694371], // NW (= v1)
+        [106.6574609, 10.7682719], // close
+      ];
+
+      // ─── Fallback demo data (matches testing/seed_gis_demo.py) ────────────
+      const FALLBACK = {
+        building: {
+          name: "Demo Office HCM",
+          address: "Nha thi dau Phu Tho, 219 Ly Thuong Kiet, District 11, Ho Chi Minh City",
+          center_lat: 10.76897572,
+          center_lng: 106.65774758,
+          total_floors: 2,
+        },
+        floors: [
+          { floor_number: 1, floor_name: "Floor 1 - Reception & Workspace", altitude_min: 0,  altitude_max: 20 },
+          { floor_number: 2, floor_name: "Floor 2 - Management & Meetings", altitude_min: 20, altitude_max: 40 },
+        ],
+        // 4 rooms per floor, one per quadrant (SW / SE / NW / NE).
+        // Mapped by sorted-name index: 101/201 -> SW, 102/202 -> SE, 103/203 -> NW, 104/204 -> NE.
+        rooms: [
+          { floor_number: 1, name: "Room 101 - Reception",      center_lat: 10.7686172, center_lng: 106.6576025, radius_meters: 4, type: "entrance"   },
+          { floor_number: 1, name: "Room 102 - Workspace",      center_lat: 10.7687403, center_lng: 106.6580588, radius_meters: 4, type: "work-zone"  },
+          { floor_number: 1, name: "Room 103 - Break Room",     center_lat: 10.7692112, center_lng: 106.6574365, radius_meters: 4, type: "meeting"    },
+          { floor_number: 1, name: "Room 104 - Engineering",    center_lat: 10.7693343, center_lng: 106.6578928, radius_meters: 4, type: "work-zone"  },
+          { floor_number: 2, name: "Room 201 - Manager Office", center_lat: 10.7686172, center_lng: 106.6576025, radius_meters: 4, type: "management" },
+          { floor_number: 2, name: "Room 202 - Meeting Room",   center_lat: 10.7687403, center_lng: 106.6580588, radius_meters: 4, type: "conference" },
+          { floor_number: 2, name: "Room 203 - HR Office",      center_lat: 10.7692112, center_lng: 106.6574365, radius_meters: 4, type: "hr"         },
+          { floor_number: 2, name: "Room 204 - Finance",        center_lat: 10.7693343, center_lng: 106.6578928, radius_meters: 4, type: "management" },
+        ],
+      };
+
+      const roomColors = {
+        entrance:   [56, 189, 248, 0.78],
+        "work-zone":[34, 197, 94, 0.72],
+        meeting:    [168, 85, 247, 0.72],
+        management: [45, 212, 191, 0.72],
+        conference: [129, 140, 248, 0.72],
+        hr:         [244, 114, 182, 0.72],
+        default:    [59, 130, 246, 0.72],
+      };
+
+      // ─── ArcGIS bootstrapping ─────────────────────────────────────────────
+      require([
+        "esri/Map",
+        "esri/views/SceneView",
+        "esri/layers/GraphicsLayer",
+        "esri/Graphic",
+        "esri/geometry/Polygon",
+        "esri/geometry/Point",
+        "esri/symbols/PolygonSymbol3D",
+        "esri/symbols/ExtrudeSymbol3DLayer",
+        "esri/symbols/PointSymbol3D",
+        "esri/symbols/IconSymbol3DLayer",
+        "esri/widgets/LayerList",
+      ], (
+        ArcGISMap, SceneView, GraphicsLayer, Graphic, Polygon, Point,
+        PolygonSymbol3D, ExtrudeSymbol3DLayer, PointSymbol3D, IconSymbol3DLayer, LayerList,
+      ) => {
+        const statusEl = document.getElementById("status");
+        const srcBadge = document.getElementById("srcBadge");
+        const floorLayers = new Map();
+
+        const map = new ArcGISMap({ basemap: "osm", ground: "world-elevation" });
+        const shellLayer = new GraphicsLayer({ title: "Building Shell",  elevationInfo: { mode: "relative-to-ground" } });
+        const centerLayer = new GraphicsLayer({ title: "Room Centers",   elevationInfo: { mode: "relative-to-ground" } });
+        map.addMany([shellLayer, centerLayer]);
+
+        const view = new SceneView({
+          container: "viewDiv",
+          map,
+          qualityProfile: "high",
+          viewingMode: "local",
+          environment: {
+            atmosphereEnabled: true,
+            lighting: { type: "sun", date: new Date("2026-05-21T09:00:00+07:00") },
+          },
+        });
+        view.ui.add(new LayerList({ view }), "top-right");
+
+        document.getElementById("showAll").addEventListener("click", () => setFloorVisibility(null));
+        document.getElementById("floor1").addEventListener("click", () => setFloorVisibility(1));
+        document.getElementById("floor2").addEventListener("click", () => setFloorVisibility(2));
+
+        loadData()
+          .then((data) => {
+            const isApi = data.__source === "api";
+            srcBadge.textContent = isApi ? "FETCHED FROM API" : "DEMO FALLBACK";
+            srcBadge.className = "src-badge " + (isApi ? "src-api" : "src-fallback");
+
+            updatePanel(data);
+            renderBuilding(data);
+
+            statusEl.textContent =
+              `Loaded ${data.floors.length} floors, ${data.rooms.length} rooms.` +
+              (isApi ? "" : " (showing bundled fallback — set API_TOKEN to fetch from backend)");
+          })
+          .catch((err) => {
+            statusEl.textContent = "Error: " + err.message;
+            console.error(err);
+          });
+
+        // ─── Data layer ──────────────────────────────────────────────────────
+
+        async function loadData() {
+          // No token configured -> use bundled demo data (file works offline).
+          if (!API_TOKEN) {
+            return { ...FALLBACK, __source: "fallback" };
+          }
+          try {
+            const headers = { Authorization: `Bearer ${API_TOKEN}` };
+
+            // GET /api/v1/buildings/?include_floors=true
+            const bResp = await fetch(`${API_BASE}/buildings/?include_floors=true`, { headers });
+            if (!bResp.ok) throw new Error(`buildings: HTTP ${bResp.status}`);
+            const bJson = await bResp.json();
+            const buildings = (bJson.data || []);
+            const b = buildings.find((x) => x.name === TARGET_BUILDING_NAME) || buildings[0];
+            if (!b) throw new Error(`No building named "${TARGET_BUILDING_NAME}" found`);
+
+            // GET /api/v1/geofences/?building_id={id}&is_active=true
+            const gResp = await fetch(`${API_BASE}/geofences/?building_id=${b.building_id}&is_active=true`, { headers });
+            if (!gResp.ok) throw new Error(`geofences: HTTP ${gResp.status}`);
+            const gJson = await gResp.json();
+            const geofences = gJson.data || [];
+
+            const floors = (b.floors || []).map((f) => ({
+              floor_number: f.floor_number,
+              floor_name:   f.floor_name,
+              altitude_min: Number(f.altitude_min ?? 0),
+              altitude_max: Number(f.altitude_max ?? 4),
+            }));
+
+            const floorNumByFloorId = new Map((b.floors || []).map((f) => [f.floor_id, f.floor_number]));
+
+            const rooms = geofences.map((g) => ({
+              floor_number: floorNumByFloorId.get(g.floor_id) ?? null,
+              name: g.name,
+              center_lat: Number(g.center_lat),
+              center_lng: Number(g.center_lng),
+              radius_meters: Number(g.radius_meters ?? 5),
+              type: classifyRoom(g.name),
+            })).filter((r) => r.floor_number !== null);
+
+            return {
+              building: {
+                name: b.name,
+                address: b.address,
+                center_lat: Number(b.center_lat),
+                center_lng: Number(b.center_lng),
+                total_floors: b.total_floors,
+              },
+              floors,
+              rooms,
+              __source: "api",
+            };
+          } catch (err) {
+            console.warn("API fetch failed, using fallback:", err);
+            return { ...FALLBACK, __source: "fallback" };
+          }
+        }
+
+        function classifyRoom(name) {
+          const n = (name || "").toLowerCase();
+          if (n.includes("reception") || n.includes("entrance")) return "entrance";
+          if (n.includes("manager"))                              return "management";
+          if (n.includes("meeting"))                              return "conference";
+          if (n.includes("hr"))                                   return "hr";
+          if (n.includes("break") || n.includes("cafe"))          return "meeting";
+          if (n.includes("workspace") || n.includes("lab"))       return "work-zone";
+          return "default";
+        }
+
+        // ─── Rendering ──────────────────────────────────────────────────────
+
+        function updatePanel(d) {
+          document.getElementById("bldName").textContent    = d.building.name || "(no name)";
+          document.getElementById("bldAddress").textContent = d.building.address || "-";
+          document.getElementById("bldLat").textContent     = d.building.center_lat;
+          document.getElementById("bldLng").textContent     = d.building.center_lng;
+          document.getElementById("bldFloors").textContent  = d.building.total_floors;
+        }
+
+        function renderBuilding(d) {
+          // The 3D shell uses the full 7-vertex OSM polygon so the base
+          // overlaps the basemap polygon edge-for-edge. Room tiles use a
+          // simplified 4-corner rotated rectangle for clean strip layout.
+          const shellRing = SHELL_POLYGON;
+          const tileRect  = TILE_RECT;
+          const buildingHeight = Math.max(...d.floors.map((f) => f.altitude_max));
+
+          view.camera = {
+            position: {
+              longitude: d.building.center_lng - 0.0013,
+              latitude:  d.building.center_lat - 0.0010,
+              z: 320,
+            },
+            heading: 35,
+            tilt: 58,
+          };
+
+          // Transparent outer shell — exact OSM polygon, no overhang.
+          shellLayer.add(extrudedPolygon({
+            rings: shellRing,
+            height: buildingHeight,
+            color: [148, 163, 184, 0.16],
+            edgeColor: [226, 232, 240, 0.9],
+            title: d.building.name,
+            attributes: {
+              Name: d.building.name,
+              Address: d.building.address,
+              Floors: d.building.total_floors,
+              HeightMeters: buildingHeight,
+            },
+          }));
+
+          // Per-floor slabs + rooms
+          d.floors.forEach((floor) => {
+            const layer = new GraphicsLayer({
+              title: `${floor.floor_name} (${floor.altitude_min}-${floor.altitude_max} m)`,
+              elevationInfo: { mode: "relative-to-ground", offset: floor.altitude_min },
+            });
+            floorLayers.set(floor.floor_number, layer);
+            map.add(layer);
+
+            // Floor slab — thicker (0.5 m) than before so the boundary
+            // between floor 1 and floor 2 is clearly visible from outside.
+            layer.add(extrudedPolygon({
+              rings: shellRing,
+              height: 0.5,
+              color: [15, 23, 42, 0.92],
+              edgeColor: [125, 211, 252, 0.9],
+              title: `${floor.floor_name} slab`,
+              attributes: {
+                Floor: floor.floor_number,
+                LevelStartMeters: floor.altitude_min,
+                LevelEndMeters: floor.altitude_max,
+              },
+            }));
+
+            // Sort rooms by name so the index -> quadrant mapping is
+            // deterministic across the API (which may return any order):
+            //   index 0 -> SW, 1 -> SE, 2 -> NW, 3 -> NE.
+            const floorRooms = d.rooms
+              .filter((r) => r.floor_number === floor.floor_number)
+              .sort((a, b) => a.name.localeCompare(b.name));
+
+            // 4-corner layout with a 2 m cross-shaped corridor.
+            //   2 m / 134 m  ≈ 0.0149 along the long axis
+            //   2 m / 102 m  ≈ 0.0196 along the short axis
+            const tiles = tileFourCorners(tileRect, 2 / 134, 2 / 102);
+
+            floorRooms.forEach((room, i) => {
+              const ring = tiles[i];
+              layer.add(extrudedPolygon({
+                rings: ring,
+                // Leave 1.2 m headroom (0.7 m above + 0.5 m slab below the
+                // next floor) so the slab between floors is plainly visible.
+                height: floor.altitude_max - floor.altitude_min - 1.2,
+                color: roomColors[room.type] || roomColors.default,
+                edgeColor: [15, 23, 42, 0.82],
+                title: `${room.name} - Floor ${floor.floor_number}`,
+                attributes: {
+                  Room: room.name,
+                  Type: room.type,
+                  Floor: floor.floor_number,
+                  RadiusMeters: room.radius_meters,
+                  Latitude: room.center_lat,
+                  Longitude: room.center_lng,
+                },
+              }));
+
+              // Label callout above the centroid of the tile.
+              const cx = (ring[0][0] + ring[2][0]) / 2;
+              const cy = (ring[0][1] + ring[2][1]) / 2;
+              centerLayer.add(new Graphic({
+                geometry: new Point({
+                  longitude: cx,
+                  latitude:  cy,
+                  z: floor.altitude_min + (floor.altitude_max - floor.altitude_min) / 2,
+                  spatialReference: { wkid: 4326 },
+                }),
+                symbol: new PointSymbol3D({
+                  symbolLayers: [new IconSymbol3DLayer({
+                    resource: { primitive: "circle" },
+                    material: { color: [14, 165, 233, 0.95] },
+                    outline: { color: [255, 255, 255, 0.9], size: 1 },
+                    size: 10,
+                  })],
+                  verticalOffset: { screenLength: 20, maxWorldLength: 80, minWorldLength: 10 },
+                  callout: { type: "line", color: [241, 245, 249, 0.85], size: 1 },
+                }),
+                popupTemplate: {
+                  title: room.name,
+                  content: [
+                    `Floor: ${floor.floor_number}`,
+                    `Type: ${room.type}`,
+                    `Geofence radius: ${room.radius_meters} m`,
+                    `Lat / Lng: ${room.center_lat}, ${room.center_lng}`,
+                  ].join("<br />"),
+                },
+              }));
+            });
+          });
+
+          view.goTo({
+            target: shellLayer.graphics.toArray(),
+            tilt: 62,
+            heading: 35,
+          });
+        }
+
+        function extrudedPolygon({ rings, height, color, edgeColor, title, attributes }) {
+          return new Graphic({
+            geometry: new Polygon({ rings: [rings], spatialReference: { wkid: 4326 } }),
+            symbol: new PolygonSymbol3D({
+              symbolLayers: [new ExtrudeSymbol3DLayer({
+                size: height,
+                material: { color },
+                edges: { type: "solid", color: edgeColor, size: 0.8 },
+              })],
+            }),
+            attributes,
+            popupTemplate: {
+              title,
+              content: Object.entries(attributes)
+                .map(([k, v]) => `<b>${k}</b>: ${v}`)
+                .join("<br />"),
+            },
+          });
+        }
+
+        function setFloorVisibility(floorNumber) {
+          floorLayers.forEach((layer, current) => {
+            layer.visible = floorNumber === null || current === floorNumber;
+          });
+          statusEl.textContent = floorNumber === null
+            ? "Showing the whole two-floor building."
+            : `Showing only floor ${floorNumber}.`;
+        }
+
+        // ─── Geometry helpers ────────────────────────────────────────────────
+
+        // Split a 4-corner rotated rectangle (closed ring of SW, SE, NE, NW, SW)
+        // into `n` equal parallel strips along the SW->SE edge, with a corridor
+        // gap of `corridorFractionPerGap` between adjacent strips. Strips run
+        // perpendicular to that edge. With `n=4, corridorFractionPerGap=0.015`
+        // the rectangle is divided as: R0 | C | R1 | C | R2 | C | R3 along its
+        // long axis (3 corridors total).
+        // Split a 4-corner rotated rectangle into 4 quadrant polygons in
+        // order [SW, SE, NW, NE], separated by a cross-shaped corridor whose
+        // long-axis width is `cl` and short-axis width is `cs` (each given
+        // as a fraction 0..1 of the rectangle's long/short edge length).
+        function tileFourCorners(rect, cl, cs) {
+          const [sw, se, , nw] = rect;
+          const ne = [nw[0] + (se[0] - sw[0]), nw[1] + (se[1] - sw[1])];
+          const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+          const point = (u, v) => lerp(lerp(sw, se, u), lerp(nw, ne, u), v);
+          const u0 = (1 - cl) / 2;
+          const u1 = (1 + cl) / 2;
+          const v0 = (1 - cs) / 2;
+          const v1 = (1 + cs) / 2;
+          return [
+            [point(0,  0 ), point(u0, 0 ), point(u0, v0), point(0,  v0), point(0,  0 )],  // SW
+            [point(u1, 0 ), point(1,  0 ), point(1,  v0), point(u1, v0), point(u1, 0 )],  // SE
+            [point(0,  v1), point(u0, v1), point(u0, 1 ), point(0,  1 ), point(0,  v1)],  // NW
+            [point(u1, v1), point(1,  v1), point(1,  1 ), point(u1, 1 ), point(u1, v1)],  // NE
+          ];
+        }
+
+        function tileAlongWidth(rect, n, corridorFractionPerGap = 0) {
+          const [sw, se, , nw] = rect;  // SW, SE, _NE, NW
+          const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+          const ne = [nw[0] + (se[0] - sw[0]), nw[1] + (se[1] - sw[1])];
+          const totalCorridor = corridorFractionPerGap * Math.max(0, n - 1);
+          const roomFraction = (1 - totalCorridor) / n;
+          const stride = roomFraction + corridorFractionPerGap;
+          const tiles = [];
+          for (let i = 0; i < n; i++) {
+            const t0 = i * stride;
+            const t1 = t0 + roomFraction;
+            const s0 = lerp(sw, se, t0);
+            const s1 = lerp(sw, se, t1);
+            const n1 = lerp(nw, ne, t1);
+            const n0 = lerp(nw, ne, t0);
+            tiles.push([s0, s1, n1, n0, s0]);
+          }
+          return tiles;
+        }
+      });
+    </script>
+  </body>
+</html>

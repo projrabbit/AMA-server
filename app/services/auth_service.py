@@ -19,7 +19,9 @@ from app.core.security import (
 from app.models.business import Account, AuditActionType
 from app.repositories.auth_repository import (
     create_audit_log,
+    create_employee_and_account,
     get_account_by_username,
+    get_employee_by_email,
     update_last_login,
 )
 from app.schemas.auth import AccountInfo, EmployeeInfo, LoginData, MeData, RefreshData
@@ -62,6 +64,64 @@ def login(
     )
 
     account.last_login_at = now
+
+    return LoginData(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=get_access_token_expire_minutes() * 60,
+        account=AccountInfo.model_validate(account),
+        employee=EmployeeInfo.model_validate(account.employee),
+    )
+
+
+def register(
+    db: Session,
+    *,
+    username: str,
+    password: str,
+    full_name: str,
+    email: str,
+    role,
+    department_name: str,
+    ip_address: str | None = None,
+) -> LoginData:
+    if get_account_by_username(db, username) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "USERNAME_EXISTS", "message": "Username already taken"},
+        )
+    if get_employee_by_email(db, email) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "EMAIL_EXISTS", "message": "Employee email already exists"},
+        )
+
+    account = create_employee_and_account(
+        db,
+        username=username,
+        password_hash=get_password_hash(password),
+        full_name=full_name,
+        email=email,
+        role=role,
+        department_name=department_name,
+    )
+
+    now = datetime.now(timezone.utc)
+    update_last_login(db, account.account_id, now)
+    account.last_login_at = now
+
+    token_data = {"sub": str(account.account_id), "role": account.role.value}
+    access_token, _ = create_access_token(token_data)
+    refresh_token, _ = create_refresh_token(token_data)
+
+    create_audit_log(
+        db,
+        account_id=account.account_id,
+        action_type=AuditActionType.create,
+        target_entity="ACCOUNT",
+        target_id=account.account_id,
+        ip_address=ip_address,
+    )
 
     return LoginData(
         access_token=access_token,

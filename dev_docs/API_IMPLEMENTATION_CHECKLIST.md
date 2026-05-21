@@ -149,8 +149,8 @@ Tracks implementation status of every endpoint defined in `FULL_API_DOCS.md`.
 
 | Status | Method | Endpoint | Notes |
 |--------|--------|----------|-------|
-| ⬜ | `GET` | `/audit-logs` | Filter by actor, action, entity, date range; max 100/page |
-| ⬜ | `GET` | `/audit-logs/{log_id}` | Full detail with before/after payload |
+| ✅ | `GET` | `/audit-logs` | Filter by `account_id`, `action_type`, `target_entity`, `since`, `until`; default `limit=20`, max 100 |
+| ✅ | `GET` | `/audit-logs/{log_id}` | Returns single `AuditLogItem` or 404 `LOG_NOT_FOUND` |
 
 **Notes**
 - `AuditLog` model in `app/models/business.py` — immutable, no write APIs via HTTP

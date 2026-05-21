@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, buildings, departments, devices, employees, floors, geofences, shifts
+from app.api.v1.endpoints import auth, audit_logs, buildings, departments, devices, employees, floors, geofences, shifts
 
 api_router = APIRouter()
 
@@ -12,3 +12,4 @@ api_router.include_router(devices.router,     prefix="/devices",     tags=["devi
 api_router.include_router(buildings.router,   prefix="/buildings",   tags=["geofence"])
 api_router.include_router(floors.router,      prefix="/floors",      tags=["geofence"])
 api_router.include_router(geofences.router,   prefix="/geofences",   tags=["geofence"])
+api_router.include_router(audit_logs.router,  prefix="/audit-logs",  tags=["audit"])
