@@ -177,7 +177,7 @@ def get_employee_detail(db: Session, employee_id: int) -> EmployeeDetailData:
         position=employee.position,
         hire_date=employee.hire_date,
         status=employee.status,
-        face_registered=False,
+        face_registered=getattr(employee, "face_reference", None) is not None,
         account=AccountDetail.model_validate(employee.account) if employee.account else None,
         device=DeviceSummary.model_validate(latest_device) if latest_device else None,
         shift=ShiftSummary.model_validate(latest_shift) if latest_shift else None,

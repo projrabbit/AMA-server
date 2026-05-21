@@ -163,6 +163,7 @@ class Employee(Base):
     devices: Mapped[list[Device]] = relationship(back_populates="employee")
     shifts: Mapped[list[Shift]] = relationship(back_populates="employee")
     attendance_records: Mapped[list[AttendanceRecord]] = relationship(back_populates="employee")
+    face_reference: Mapped[FaceReference | None] = relationship(back_populates="employee", uselist=False)
 
 
 class Account(Base):
@@ -427,3 +428,30 @@ class AuditLog(Base):
     )
 
     account: Mapped[Account] = relationship(back_populates="audit_logs")
+
+
+class FaceReference(Base):
+    __tablename__ = "face_reference"
+    __table_args__ = (
+        Index("ix_business_face_reference_employee_id", "employee_id", unique=True),
+        {"schema": BUSINESS_SCHEMA},
+    )
+
+    face_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    employee_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            f"{BUSINESS_SCHEMA}.employee.employee_id",
+            name="fk_business_face_reference_employee_id_employee",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        unique=True,
+    )
+    face_object_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    registered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+
+    employee: Mapped[Employee] = relationship(back_populates="face_reference")

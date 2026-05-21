@@ -11,6 +11,7 @@ from app.models.business import (
     DevicePlatform,
     Employee,
     EmployeeStatus,
+    FaceReference,
     FraudDetection,
     Shift,
 )
@@ -41,6 +42,7 @@ __all__ = [
     "DevicePlatform",
     "Employee",
     "EmployeeStatus",
+    "FaceReference",
     "Floor",
     "FraudDetection",
     "GeofenceRule",

@@ -7,7 +7,7 @@ Tracks implementation status of every endpoint defined in `FULL_API_DOCS.md`.
 - 🚧 In Progress — partially implemented
 - ⬜ Not Started
 
-**Progress**: 31 / 47 endpoints complete
+**Progress**: 35 / 47 endpoints complete
 
 ---
 
@@ -101,15 +101,29 @@ Tracks implementation status of every endpoint defined in `FULL_API_DOCS.md`.
 
 | Status | Method | Endpoint | Notes |
 |--------|--------|----------|-------|
-| ⬜ | `POST` | `/employees/{employee_id}/face` | Upload reference face; stored in MinIO/S3 |
-| ⬜ | `GET` | `/employees/{employee_id}/face` | Returns metadata only, not the image |
-| ⬜ | `DELETE` | `/employees/{employee_id}/face` | Removes stored reference |
-| ⬜ | `POST` | `/internal/face/verify` | Internal; returns match + liveness scores |
+| ✅ | `POST` | `/employees/{employee_id}/face` | Upload reference face; mediapipe face detection; stored in MinIO |
+| ✅ | `GET` | `/employees/{employee_id}/face` | Returns metadata only; 404 if employee not found |
+| ✅ | `DELETE` | `/employees/{employee_id}/face` | Deletes MinIO object + DB row; 404 FACE_NOT_REGISTERED if none |
+| ✅ | `POST` | `/internal/face/verify` | No auth guard; FaceMesh cosine similarity + liveness signal scoring |
 
-**Notes**
-- Face images stored in object storage (MinIO or S3); DB stores the object key only
-- Requires `face_recognition` / `opencv` / `mediapipe` libraries (not yet in `pyproject.toml`)
-- Object storage client not yet configured
+**Files written**
+- `app/models/business.py` — ADD `FaceReference`: face_id, employee_id (unique FK), face_object_key, registered_at; ADD face_reference relationship to Employee
+- `alembic/versions/1cb0ebeb16f1_add_face_reference_table.py` — migration applied
+- `app/core/storage.py` — MinIO singleton, upload/download/delete helpers, bucket auto-create
+- `app/schemas/face.py` — FaceStatusData, RegisterFaceData, DeleteFaceData, VerifyFaceData
+- `app/repositories/face_repository.py` — get_face_reference, upsert_face_reference, delete_face_reference
+- `app/services/face_service.py` — register_employee_face, get_face_status, remove_employee_face, verify_face_internal; mediapipe FaceDetection + FaceMesh helpers
+- `app/api/v1/endpoints/face.py` — employee_face_router (3 routes) + internal_face_router (1 route)
+- `app/api/v1/router.py` — registered both routers under /employees and /internal prefixes
+- `app/repositories/admin_repository.py` — joinedload(Employee.face_reference) added to get_employee_by_id
+- `app/services/admin_service.py` — replaced face_registered=False stub with employee.face_reference is not None
+- `pyproject.toml` — added: python-multipart, minio, mediapipe, Pillow
+- `tests/face/__init__.py`
+- `tests/face/conftest.py` — make_face_reference, as_hr, as_admin, as_employee
+- `tests/face/test_face_register.py` — 10 tests
+- `tests/face/test_face_status.py` — 4 tests
+- `tests/face/test_face_delete.py` — 4 tests
+- `tests/face/test_face_verify.py` — 4 tests
 
 ---
 
