@@ -13,6 +13,7 @@ from app.models.business import (
     DevicePlatform,
     Employee,
     EmployeeStatus,
+    FaceReference,
     Shift,
 )
 
@@ -56,6 +57,7 @@ def get_employee_by_id(db: Session, employee_id: int) -> Employee | None:
             joinedload(Employee.department),
             joinedload(Employee.devices),
             joinedload(Employee.shifts),
+            joinedload(Employee.face_reference),
         )
         .filter(Employee.employee_id == employee_id)
         .first()
