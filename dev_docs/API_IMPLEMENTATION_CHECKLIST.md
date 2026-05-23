@@ -7,7 +7,7 @@ Tracks implementation status of every endpoint defined in `FULL_API_DOCS.md`.
 - 🚧 In Progress — partially implemented
 - ⬜ Not Started
 
-**Progress**: 35 / 47 endpoints complete
+**Progress**: 57 / 57 endpoints complete 🎉
 
 ---
 
@@ -36,18 +36,32 @@ Tracks implementation status of every endpoint defined in `FULL_API_DOCS.md`.
 
 | Status | Method | Endpoint | Notes |
 |--------|--------|----------|-------|
-| ⬜ | `POST` | `/attendance/check-in` | multipart/form-data; GPS + face + liveness + fraud pipeline |
-| ⬜ | `POST` | `/attendance/check-out` | Same pipeline; pairs with check-in record |
-| ⬜ | `GET` | `/attendance/today-status` | Mobile home screen state |
-| ⬜ | `GET` | `/attendance/history` | Date-range, paginated, role-scoped |
-| ⬜ | `GET` | `/attendance/exceptions` | Rejected / late / early-leave list |
-| ⬜ | `GET` | `/attendance/{record_id}` | Full detail including fraud result |
-| ⬜ | `PUT` | `/attendance/{record_id}/approve` | Manual HR override |
+| ✅ | `POST` | `/attendance/check-in` | multipart/form-data; GPS threshold 20 m; MinIO selfie upload before fraud eval; always writes record; status=rejected if outside geofence or face/liveness fail; status=flagged if other fraud flags; `_run_checkin_pipeline` shared with check-out |
+| ✅ | `POST` | `/attendance/check-out` | Same pipeline as check-in; sets `matched_checkin_record_id` + `worked_minutes`; 409 `FAILED_NO_CHECKIN` if no approved/flagged check-in today |
+| ✅ | `GET` | `/attendance/today-status` | `can_check_in/can_check_out` derived from today's active checkin/checkout presence; employee-only |
+| ✅ | `GET` | `/attendance/history` | Required `from`/`to` params (`alias="from"` for reserved word); employee locked to self; service groups records by date; returns 5-tuple; all times in +07:00 |
+| ✅ | `GET` | `/attendance/exceptions` | Default filter shows rejected/flagged/late/early-leave; `status` param narrows; OR filter built in repository |
+| ✅ | `GET` | `/attendance/{record_id}` | hr/admin only; joinloads employee+dept, device, shift, fraud_detection; 404 `RECORD_NOT_FOUND` |
+| ✅ | `PUT` | `/attendance/{record_id}/approve` | 404 `RECORD_NOT_FOUND`; 409 `ALREADY_APPROVED`; sets approved_by_account_id + approved_at; writes audit log |
 
-**Dependencies before starting**
-- Module 3 (Geofence) — geofence lookup needed for check-in validation
-- Module 4 (Fraud Detection) — evaluate fraud before writing record
-- Module 5 (Face Verification) — face match called during check-in
+**Files written**
+- `app/models/business.py` — MODIFIED `AttendanceRecord`: `geofence_rule_id` now nullable; added `face_image_object_key`, `matched_checkin_record_id` (self-ref FK, `use_alter=True`), `worked_minutes`, `approved_by_account_id`, `approved_at`; 2 new indexes
+- `alembic/versions/e8509aa02ee1_extend_attendance_record_add_new_columns.py` — migration applied
+- `app/repositories/geofence_repository.py` — MODIFIED: added `find_geofence_for_location` (Haversine, altitude range check)
+- `app/schemas/attendance.py` — all request/response models
+- `app/repositories/attendance_repository.py` — all DB queries
+- `app/services/attendance_service.py` — full check-in/check-out pipeline + 5 other service functions
+- `app/api/v1/endpoints/attendance.py` — 7 route handlers
+- `app/api/v1/router.py` — registered attendance router under `/attendance`
+- `tests/attendance/__init__.py`
+- `tests/attendance/conftest.py` — `make_shift`, `make_device`, `make_fraud_detection`, `make_attendance_record`, `as_employee`, `as_hr`, `as_admin`
+- `tests/attendance/test_checkin.py` — 10 tests
+- `tests/attendance/test_checkout.py` — 5 tests
+- `tests/attendance/test_today_status.py` — 5 tests
+- `tests/attendance/test_history.py` — 9 tests
+- `tests/attendance/test_exceptions.py` — 6 tests
+- `tests/attendance/test_record_detail.py` — 5 tests
+- `tests/attendance/test_approve.py` — 7 tests
 
 ---
 
@@ -86,14 +100,29 @@ Tracks implementation status of every endpoint defined in `FULL_API_DOCS.md`.
 
 | Status | Method | Endpoint | Notes |
 |--------|--------|----------|-------|
-| ⬜ | `POST` | `/internal/fraud/evaluate` | Internal only; not exposed publicly |
-| ⬜ | `GET` | `/fraud/records` | Filter by flags, date range, confidence score |
-| ⬜ | `GET` | `/fraud/records/{fraud_id}` | Full detail with linked attendance record |
+| ✅ | `POST` | `/internal/fraud/evaluate` | No JWT guard; pure evaluation — no DB write; detects 6 fraud flags; confidence score via deduction formula (mock_location −40, gps_spoofing −35, face_mismatch −30, liveness_failed −25, buddy_punch −25, unknown_device −20) |
+| ✅ | `GET` | `/fraud/records` | 11 optional filters; `contains_eager` join through `attendance_record → employee → department`; ordered by `checked_at DESC` |
+| ✅ | `GET` | `/fraud/records/{fraud_id}` | `joinedload` for employee, department, and device chains; 404 `FRAUD_NOT_FOUND` if missing |
 
 **Notes**
-- `FraudDetection` model is in `app/models/business.py`
-- Fraud evaluation is called inline during attendance check-in/out
-- `buddy_punch` detection requires querying recent records for the same device used by different employees
+- `FraudDetection` model was extended with 4 missing columns (`unknown_device`, `face_mismatch_detected`, `liveness_failed`, `confidence_score`) via migration `1430b8e61515`
+- Face comparison in `evaluate` reuses `_extract_landmarks`, `_cosine_similarity`, `_liveness_score` helpers imported from `face_service`; selfie downloaded from MinIO via `face_image_object_key`
+- `buddy_punch` detection queries `attendance_record JOIN device` for same `device_fingerprint` used by a different `employee_id` in last 24 h
+- `unknown_device` = device not found for that employee OR `is_trusted = False`
+
+**Files written**
+- `app/models/business.py` — MODIFIED `FraudDetection`: added `unknown_device`, `face_mismatch_detected`, `liveness_failed`, `confidence_score` columns
+- `alembic/versions/1430b8e61515_add_missing_columns_to_fraud_detection.py` — migration applied
+- `app/schemas/fraud.py` — `LivenessSignals`, `RawSignals`, `EvaluateFraudRequest`, `EvaluateFraudResult`, `FraudEmployeeInfo`, `FraudRecordItem`, `FraudAttendanceInfo`, `FraudDeviceInfo`, `FraudRecordDetailData`
+- `app/repositories/fraud_repository.py` — `get_fraud_records`, `get_fraud_record_by_id`, `get_recent_device_records`, `get_device_by_fingerprint_and_employee`
+- `app/services/fraud_service.py` — `evaluate_fraud`, `list_fraud_records`, `get_fraud_record_detail`
+- `app/api/v1/endpoints/fraud.py` — `internal_fraud_router` (POST /evaluate) + `fraud_router` (GET /records, GET /records/{fraud_id})
+- `app/api/v1/router.py` — registered `fraud_router` under `/fraud` and `internal_fraud_router` under `/internal`
+- `tests/fraud/__init__.py`
+- `tests/fraud/conftest.py` — `make_department`, `make_device`, `make_attendance_record`, `make_employee_with_dept`, `make_fraud_record`, `as_hr`, `as_admin`, `as_employee`
+- `tests/fraud/test_evaluate.py` — 14 tests
+- `tests/fraud/test_fraud_records.py` — 8 tests
+- `tests/fraud/test_fraud_detail.py` — 6 tests
 
 ---
 
@@ -131,16 +160,33 @@ Tracks implementation status of every endpoint defined in `FULL_API_DOCS.md`.
 
 | Status | Method | Endpoint | Notes |
 |--------|--------|----------|-------|
-| ⬜ | `GET` | `/notifications` | Paginated; filter by `is_read`, `type` |
-| ⬜ | `PUT` | `/notifications/{notification_id}/read` | Owner-only |
-| ⬜ | `PUT` | `/notifications/read-all` | Bulk mark read |
-| ⬜ | `GET` | `/notifications/preferences` | Per-user push/in-app settings |
-| ⬜ | `PUT` | `/notifications/preferences` | Update preferences |
-| ⬜ | `POST` | `/internal/notifications/send` | Internal dispatch called after attendance record creation |
+| ✅ | `GET` | `/notifications` | Paginated; filter by `is_read`, `type`; returns `(items, total, unread_count)` tuple; `meta` includes `total_pages` and `unread_count` |
+| ✅ | `PUT` | `/notifications/{notification_id}/read` | Owner-only; 403 `FORBIDDEN` if `notif.account_id != account_id`; 404 `NOTIFICATION_NOT_FOUND` if missing |
+| ✅ | `PUT` | `/notifications/read-all` | Bulk SQLAlchemy `update()` returning `rowcount`; static path registered before `/{notification_id}/read` to avoid route conflict |
+| ✅ | `GET` | `/notifications/preferences` | Get-or-create (upsert) pattern — first access inserts all-true defaults; no 404 ever |
+| ✅ | `PUT` | `/notifications/preferences` | All 8 boolean fields required; validation raises 422 on missing field |
+| ✅ | `POST` | `/internal/notifications/send` | No JWT guard; unknown `account_ids` silently skipped and counted in `failed_count`; valid accounts counted in `sent_count`; single commit after all inserts |
 
 **Notes**
-- No `Notification` or `NotificationPreference` table exists in current models — must be added to `app/models/business.py` and a new migration created
-- Push delivery integration (FCM / APNs) is out of scope for MVP backend; `send` endpoint creates in-app records only
+- `Notification` and `NotificationPreference` tables added to `app/models/business.py`; migration `6b9d84669f48` applied
+- Push delivery integration (FCM / APNs) out of scope for MVP; `send` endpoint creates in-app `Notification` rows only
+- Route registration order in `notifications.py` is critical: `/read-all`, `/preferences` (static) must be registered before `/{notification_id}/read` (parametric)
+
+**Files written**
+- `app/models/business.py` — MODIFIED: added `NotificationType` enum, `notification_type_enum` SQLEnum; added `Notification`, `NotificationPreference` model classes; added `notifications` + `notification_preference` relationships on `Account`
+- `alembic/versions/6b9d84669f48_add_notification_and_notification_.py` — migration applied
+- `app/schemas/notification.py` — `NotificationItem`, `MarkReadData`, `MarkAllReadData`, `NotificationPreferenceData`, `UpdatePreferencesRequest`, `UpdatePreferencesData`, `SendNotificationRequest`, `SendNotificationData`
+- `app/repositories/notification_repository.py` — `get_notifications`, `count_notifications`, `count_unread`, `get_notification_by_id`, `mark_notification_read`, `mark_all_read`, `get_or_create_preferences`, `update_preferences`, `get_account_by_id_simple`, `create_notification`
+- `app/services/notification_service.py` — `list_notifications`, `mark_read`, `mark_all_notifications_read`, `get_preferences`, `update_notification_preferences`, `send_notifications`
+- `app/api/v1/endpoints/notifications.py` — `notification_router` (5 routes) + `internal_notification_router` (1 route)
+- `app/api/v1/router.py` — registered `notification_router` under `/notifications` and `internal_notification_router` under `/internal`
+- `tests/notification/__init__.py`
+- `tests/notification/conftest.py` — `make_notification`, `make_preference`, `as_employee`, `as_hr`, `as_admin`, `employee_account`, `hr_account`
+- `tests/notification/test_list_notifications.py` — 8 tests
+- `tests/notification/test_mark_read.py` — 6 tests
+- `tests/notification/test_mark_all_read.py` — 4 tests
+- `tests/notification/test_preferences.py` — 8 tests
+- `tests/notification/test_send_notification.py` — 5 tests
 
 ---
 
@@ -148,14 +194,24 @@ Tracks implementation status of every endpoint defined in `FULL_API_DOCS.md`.
 
 | Status | Method | Endpoint | Notes |
 |--------|--------|----------|-------|
-| ⬜ | `GET` | `/dashboard/summary` | KPIs for today; designed for 60s polling |
-| ⬜ | `GET` | `/realtime/employees-location` | Active check-ins without checkout; 30s polling |
-| ⬜ | `GET` | `/reports/attendance` | Date-range report with per-employee summary |
-| ⬜ | `GET` | `/reports/attendance/export` | Binary Excel/PDF response |
+| ✅ | `GET` | `/dashboard/summary` | `date` defaults to today (+07:00); `absent_count` = shift-holders minus checked-in shift-holders; `on_time_rate` = on_time / total_employees × 100 rounded 2dp; `meta.refresh_interval_seconds=60` |
+| ✅ | `GET` | `/realtime/employees-location` | Approved/flagged checkin today with no checkout; optional `building_id`/`floor_id`/`department_id` filters via subqueries; `arcgis_layer_id` from CellSpace; `meta.refresh_interval_seconds=30`; hr/admin only |
+| ✅ | `GET` | `/reports/attendance` | Required `from`/`to` (`alias="from"` workaround); records grouped in-memory by employee; `absent_count` per employee = range_days − work_days; no pagination; manager/hr/admin |
+| ✅ | `GET` | `/reports/attendance/export` | Returns `Response` (not `SuccessResponse[T]`); 400 `INVALID_EXPORT_FORMAT`; 404 `NO_REPORT_DATA` when no records; 3 sheets Excel (Summary, By Employee, Details); single-page PDF via reportlab; hr/admin only |
 
-**Notes**
-- Export requires `openpyxl` (Excel) and `reportlab` or `weasyprint` (PDF) — not yet in `pyproject.toml`
-- Dashboard and realtime queries should be optimised with DB indexes already defined on `attendance_record.timestamp` and `attendance_record.status`
+**Files written**
+- `pyproject.toml` — ADDED: `openpyxl>=3.1.0`, `reportlab>=4.0.0`
+- `app/schemas/report.py` — `ActiveLocationItem`, `DashboardSummaryData`, `RealtimeLocationItem`, `ReportSummary`, `ReportEmployeeSummary`, `ReportDayDetail`, `AttendanceReportData`
+- `app/repositories/report_repository.py` — `get_active_employee_count`, `get_shift_holder_count`, `get_dashboard_checkin_stats`, `get_fraud_alert_count`, `get_checked_in_shift_holders_count`, `get_active_locations`, `get_realtime_locations`, `get_report_records`
+- `app/services/report_service.py` — `get_dashboard_summary`, `get_realtime_locations`, `get_attendance_report`, `export_attendance_report`, `_generate_excel`, `_generate_pdf`
+- `app/api/v1/endpoints/report.py` — `dashboard_router` (1 route), `realtime_router` (1 route), `reports_router` (2 routes: export registered before attendance to avoid path conflict)
+- `app/api/v1/router.py` — REGISTERED: 3 routers under `/dashboard`, `/realtime`, `/reports`
+- `tests/report/__init__.py`
+- `tests/report/conftest.py` — `make_active_location`, `make_realtime_location`, `make_report_data`, `as_hr`, `as_admin`, `as_manager`, `as_employee`
+- `tests/report/test_dashboard.py` — 10 tests
+- `tests/report/test_realtime.py` — 8 tests
+- `tests/report/test_attendance_report.py` — 11 tests
+- `tests/report/test_export.py` — 11 tests
 
 ---
 
@@ -251,8 +307,8 @@ The modules have dependencies. This order minimises blocked work:
 
 | Model | Needed For | Status |
 |-------|-----------|--------|
-| `Notification` | Module 6 | ⬜ Not in `business.py` |
-| `NotificationPreference` | Module 6 | ⬜ Not in `business.py` |
+| `Notification` | Module 6 | ✅ Added in migration `6b9d84669f48` |
+| `NotificationPreference` | Module 6 | ✅ Added in migration `6b9d84669f48` |
 
 ## Missing Python Dependencies (Must Add to `pyproject.toml`)
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -237,3 +239,48 @@ def disable_geofence(db: Session, rule: GeofenceRule) -> GeofenceRule:
     db.commit()
     db.refresh(rule)
     return rule
+
+
+def find_geofence_for_location(
+    db: Session,
+    lat: float,
+    lng: float,
+    altitude: float | None,
+    *,
+    allow_checkin: bool = True,
+    allow_checkout: bool = False,
+) -> GeofenceRule | None:
+    stmt = (
+        select(GeofenceRule)
+        .join(GeofenceRule.cell_space)
+        .options(
+            joinedload(GeofenceRule.cell_space)
+            .joinedload(CellSpace.floor)
+            .joinedload(Floor.building)
+        )
+        .where(GeofenceRule.is_active == True)  # noqa: E712
+    )
+    if allow_checkin:
+        stmt = stmt.where(GeofenceRule.allow_checkin == True)  # noqa: E712
+    if allow_checkout:
+        stmt = stmt.where(GeofenceRule.allow_checkout == True)  # noqa: E712
+    rules = list(db.execute(stmt).unique().scalars().all())
+
+    _R = 6_371_000.0
+    for rule in rules:
+        cs = rule.cell_space
+        if cs.center_lat is None or cs.center_lng is None or rule.allowed_radius_m is None:
+            continue
+        lat1, lng1 = math.radians(lat), math.radians(lng)
+        lat2, lng2 = math.radians(float(cs.center_lat)), math.radians(float(cs.center_lng))
+        a = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lng2 - lng1) / 2) ** 2
+        distance = 2 * _R * math.asin(math.sqrt(a))
+        if distance > float(rule.allowed_radius_m):
+            continue
+        if altitude is not None:
+            if rule.altitude_min is not None and altitude < float(rule.altitude_min):
+                continue
+            if rule.altitude_max is not None and altitude > float(rule.altitude_max):
+                continue
+        return rule
+    return None
