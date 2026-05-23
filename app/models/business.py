@@ -76,12 +76,22 @@ class AuditActionType(str, enum.Enum):
     reject = "reject"
 
 
+class NotificationType(str, enum.Enum):
+    checkin_approved = "checkin_approved"
+    checkin_rejected = "checkin_rejected"
+    checkout_approved = "checkout_approved"
+    checkout_rejected = "checkout_rejected"
+    device_trusted = "device_trusted"
+    exception_flagged = "exception_flagged"
+
+
 employee_status_enum = SQLEnum(EmployeeStatus, name="employee_status", schema=BUSINESS_SCHEMA)
 account_role_enum = SQLEnum(AccountRole, name="account_role", schema=BUSINESS_SCHEMA)
 device_platform_enum = SQLEnum(DevicePlatform, name="device_platform", schema=BUSINESS_SCHEMA)
 attendance_type_enum = SQLEnum(AttendanceType, name="attendance_type", schema=BUSINESS_SCHEMA)
 attendance_status_enum = SQLEnum(AttendanceStatus, name="attendance_status", schema=BUSINESS_SCHEMA)
 audit_action_type_enum = SQLEnum(AuditActionType, name="audit_action_type", schema=BUSINESS_SCHEMA)
+notification_type_enum = SQLEnum(NotificationType, name="notification_type", schema=BUSINESS_SCHEMA)
 
 
 class Department(Base):
@@ -197,6 +207,10 @@ class Account(Base):
 
     employee: Mapped[Employee] = relationship(back_populates="account")
     audit_logs: Mapped[list[AuditLog]] = relationship(back_populates="account")
+    notifications: Mapped[list[Notification]] = relationship(back_populates="account")
+    notification_preference: Mapped[NotificationPreference | None] = relationship(
+        back_populates="account", uselist=False
+    )
 
 
 class Device(Base):
@@ -298,6 +312,8 @@ class AttendanceRecord(Base):
         Index("ix_business_attendance_record_timestamp", "timestamp"),
         Index("ix_business_attendance_record_status", "status"),
         Index("ix_business_attendance_record_type", "type"),
+        Index("ix_business_attendance_record_matched_checkin_record_id", "matched_checkin_record_id"),
+        Index("ix_business_attendance_record_approved_by_account_id", "approved_by_account_id"),
         {"schema": BUSINESS_SCHEMA},
     )
 
@@ -326,13 +342,12 @@ class AttendanceRecord(Base):
         ),
         nullable=False,
     )
-    geofence_rule_id: Mapped[int] = mapped_column(
+    geofence_rule_id: Mapped[int | None] = mapped_column(
         ForeignKey(
             "gis.geofence_rule.geofence_rule_id",
             name="fk_business_attendance_record_geofence_rule_id_geofence_rule",
-            ondelete="RESTRICT",
+            ondelete="SET NULL",
         ),
-        nullable=False,
     )
     type: Mapped[AttendanceType] = mapped_column(attendance_type_enum, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(
@@ -352,11 +367,29 @@ class AttendanceRecord(Base):
     rejection_reason: Mapped[str | None] = mapped_column(Text)
     is_late: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
     is_early_leave: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    face_image_object_key: Mapped[str | None] = mapped_column(String(500))
+    matched_checkin_record_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            f"{BUSINESS_SCHEMA}.attendance_record.record_id",
+            name="fk_business_attendance_record_matched_checkin_record_id",
+            ondelete="SET NULL",
+            use_alter=True,
+        ),
+    )
+    worked_minutes: Mapped[int | None] = mapped_column(Integer)
+    approved_by_account_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            f"{BUSINESS_SCHEMA}.account.account_id",
+            name="fk_business_attendance_record_approved_by_account_id",
+            ondelete="SET NULL",
+        ),
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     employee: Mapped[Employee] = relationship(back_populates="attendance_records")
     device: Mapped[Device] = relationship(back_populates="attendance_records")
     shift: Mapped[Shift] = relationship(back_populates="attendance_records")
-    geofence_rule: Mapped[GeofenceRule] = relationship(back_populates="attendance_records")
+    geofence_rule: Mapped[GeofenceRule | None] = relationship(back_populates="attendance_records")
     fraud_detection: Mapped[FraudDetection | None] = relationship(
         back_populates="attendance_record",
         uselist=False,
@@ -386,6 +419,10 @@ class FraudDetection(Base):
     mock_location_detected: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
     gps_spoofing_detected: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
     buddy_punch_suspected: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    unknown_device: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    face_mismatch_detected: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    liveness_failed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    confidence_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     reason: Mapped[str | None] = mapped_column(Text)
     checked_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -455,3 +492,65 @@ class FaceReference(Base):
     )
 
     employee: Mapped[Employee] = relationship(back_populates="face_reference")
+
+
+class Notification(Base):
+    __tablename__ = "notification"
+    __table_args__ = (
+        Index("ix_business_notification_account_id", "account_id"),
+        Index("ix_business_notification_is_read", "is_read"),
+        Index("ix_business_notification_type", "type"),
+        Index("ix_business_notification_created_at", "created_at"),
+        {"schema": BUSINESS_SCHEMA},
+    )
+
+    notification_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            f"{BUSINESS_SCHEMA}.account.account_id",
+            name="fk_business_notification_account_id_account",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+    type: Mapped[NotificationType] = mapped_column(notification_type_enum, nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+    meta: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
+    account: Mapped[Account] = relationship(back_populates="notifications")
+
+
+class NotificationPreference(Base):
+    __tablename__ = "notification_preference"
+    __table_args__ = (
+        Index("ix_business_notification_preference_account_id", "account_id", unique=True),
+        {"schema": BUSINESS_SCHEMA},
+    )
+
+    preference_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            f"{BUSINESS_SCHEMA}.account.account_id",
+            name="fk_business_notification_preference_account_id_account",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        unique=True,
+    )
+    push_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    in_app_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    notify_checkin_approved: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    notify_checkin_rejected: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    notify_checkout_approved: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    notify_checkout_rejected: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    notify_device_trusted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    notify_exception_flagged: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+
+    account: Mapped[Account] = relationship(back_populates="notification_preference")
